@@ -1,0 +1,20 @@
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Logs and temp
+*.log
+tmp/
+.tmp/
+
+# Node (in case anyone adds tooling later)
+node_modules/
+
+# Local env / secrets — never commit
+.env
+.env.*
+*.pem
+*.key
+.credentials.json
