@@ -12,6 +12,10 @@ tmp/
 # Node (in case anyone adds tooling later)
 node_modules/
 
+# Python (skills with stdlib helpers, e.g. x/publish-core)
+__pycache__/
+*.pyc
+
 # Local env / secrets — never commit
 .env
 .env.*
