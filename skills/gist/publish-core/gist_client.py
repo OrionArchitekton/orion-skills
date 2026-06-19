@@ -138,6 +138,9 @@ def build_plan(files: dict, repo: str, ref: str, description: str) -> dict:
             "lines": content.count("\n") + (1 if content and not content.endswith("\n") else 0),
             "verdict": verdict,
             "hit_classes": sorted({c for c, _ in hits}),
+            # Keep the MASKED snippets (never raw secrets — redactor.scan masks
+            # them) so a human can eyeball each matched value before --ack-public-hits.
+            "hits": [{"class": c, "masked": m} for c, m in hits],
         })
     return {
         "repo": repo, "ref": ref, "description": description,
@@ -151,9 +154,12 @@ def print_plan(plan: dict) -> None:
     print(f"  description : {plan['description']!r}")
     print(f"  files       : {len(plan['files'])}")
     for f in plan["files"]:
-        extra = f"  HITS={f['hit_classes']}" if f["verdict"] != "PUBLISH" else ""
         print(f"    - {f['filename']}  ({f['bytes']}B, {f['lines']} lines)  "
-              f"redactor={f['verdict']}{extra}")
+              f"redactor={f['verdict']}")
+        # Print each MASKED hit so a human can eyeball the actual matched value
+        # (not just its class) before deciding to --ack-public-hits.
+        for h in f.get("hits", []):
+            print(f"        HIT [{h['class']}] {h['masked']}")
 
 
 def create_gist(files: dict, description: str) -> str:
@@ -225,12 +231,28 @@ def main(argv) -> int:
     files = {}
     for p in paths:
         try:
+            name = gist_filename(p, filename)
+        except ValueError as exc:
+            print(f"REFUSED: {exc}", file=sys.stderr)
+            common.log_line(f"gist REFUSED reason=bad-filename path={p}")
+            return 2
+        # Refuse a basename collision rather than silently dropping a file: two
+        # paths with the same basename (docs/README.md + examples/README.md) would
+        # otherwise overwrite each other in this dict, shipping fewer files than
+        # the user asked for. (--filename is already barred with multiple paths.)
+        if name in files:
+            print(f"error: duplicate gist filename {name!r} from path {p!r}; "
+                  "two sources share a basename — rename one or fetch them in "
+                  "separate gists", file=sys.stderr)
+            common.log_line(f"gist REFUSED reason=filename-collision name={name}")
+            return 2
+        try:
             content = fetch_public(repo, ref, p)
         except RuntimeError as exc:
             print(f"REFUSED: {exc}", file=sys.stderr)
             common.log_line(f"gist REFUSED reason=fetch path={p}")
             return 3
-        files[gist_filename(p, filename)] = content
+        files[name] = content
 
     # 2. Redaction backstop. The raw-fetch already proved world-readability, so a
     #    hit is a false positive; it still BLOCKS by default (fail-closed) unless a

@@ -104,6 +104,15 @@ def test_gist_client():
     plan = gist_client.build_plan(dirty, "owner/repo", "main", "d")
     _check("backstop-abstains-on-dirty", plan["clean"] is False,
            f"verdicts={[f['verdict'] for f in plan['files']]}")
+    # The plan must carry the MASKED hit snippets (not just classes) so a human
+    # can eyeball each matched value before --ack-public-hits — and never the raw.
+    hits = plan["files"][0]["hits"]
+    masked_vals = [h["masked"] for h in hits]
+    _check("plan-keeps-masked-hits", len(hits) >= 1 and all("*" in m for m in masked_vals),
+           f"masked={masked_vals}")
+    _check("plan-masks-not-raw",
+           all("ghp_AbCdEf0123456789ghIjKlMnOpQrStUv" not in m for m in masked_vals)
+           and all("10.1.2.3" not in m for m in masked_vals))
     clean = {"NOTE.md": "An embeddable gist of already-public content. Derive-from-public is "
                         "the guard; the redactor is a backstop.\n"}
     plan = gist_client.build_plan(clean, "owner/repo", "main", "d")
@@ -134,6 +143,16 @@ def test_gist_client():
             _check(f"filename-rejects[{bad}]", False, "did not raise")
         except ValueError:
             _check(f"filename-rejects[{bad}]", True)
+
+    # Duplicate basenames must be REFUSED (not silently collapsed/overwritten).
+    orig_fetch = gist_client.fetch_public
+    gist_client.fetch_public = lambda repo, ref, path, timeout=15: f"content of {path}\n"
+    try:
+        rc = gist_client.main(["create", "--repo", "owner/repo",
+                               "--path", "docs/README.md", "--path", "examples/README.md"])
+        _check("dup-basename-refused (exit 2)", rc == 2, f"rc={rc}")
+    finally:
+        gist_client.fetch_public = orig_fetch
 
 
 def test_gist_live_cap():
