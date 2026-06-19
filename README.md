@@ -46,6 +46,7 @@ their frontmatter.
 | [`goal-prompt`](skills/goal-prompt/SKILL.md) | Turns a loose task into a fire-ready autonomous goal prompt: recon-grounded, rails-locked, with a transcript-checkable terminal condition. Builds the prompt; never fires it. | You want to author a `/goal` or `/deep-research` prompt for a hands-off run. |
 | [`pre-compact`](skills/pre-compact/SKILL.md) | Captures a session into a persistent, queryable context pack so a fresh instance resumes with zero re-derivation. Engine-agnostic. | Before `/compact`, near the context limit, or handing off in-progress work. |
 | [`x`](skills/x/SKILL.md) | Post to X (Twitter) — manually or autonomously — behind a fail-closed safety harness: a redactor that abstains rather than leak, a per-day cap, and an arm-flag so it ships DISARMED. Direct OAuth1.0a, stdlib-only. | An agent should publish a short note to X, safely — manual or hands-off. |
+| [`gist`](skills/gist/SKILL.md) | Publish an embeddable PUBLIC gist of ALREADY-public content — fetched over the unauthenticated raw URL so world-readability is structural, not a promise. Redactor backstop, per-day cap, ships DISARMED, human-gated. The safe pattern for a code surface. | You want to share/embed a file that is already in a public repo, safely. |
 
 ### Worked examples (one per skill)
 
@@ -80,6 +81,10 @@ their frontmatter.
   the fail-closed redactor checks it (ABSTAIN → don't publish), the per-day cap is checked,
   and — only if you've armed the system — it sends via direct OAuth1.0a; otherwise it
   dry-runs and prints the signed request's shape without sending. Ships DISARMED.
+- **`gist`** — You want to embed a file from a public repo on a page. `/gist` fetches it
+  over the unauthenticated raw URL (a 200 proves it's already world-readable), runs the
+  redactor backstop, and — only if you've armed the system — `gh gist create --public`s it;
+  otherwise it prints the dry-run plan and creates nothing. Human-gated, ships DISARMED.
 
 ## Authoring conventions
 

@@ -1,0 +1,33 @@
+# x-denylist.sample.txt — YOUR custom redactor patterns.
+#
+# Copy this to ~/.claude/config/x-denylist.txt (or set $X_DENYLIST_FILE to its
+# path) and replace the examples with YOUR private nouns. Keeping this file
+# OUTSIDE the skill means: it survives skill updates, and you never accidentally
+# publish your own denylist if you share the skill.
+#
+# Format: one Python regex per line, matched case-insensitively. # starts a
+# comment. A plain word is a valid regex (matches itself). Use \b...\b for
+# word boundaries on short tokens so you don't match inside ordinary words.
+# Built-in UNIVERSAL patterns (secrets, RFC-1918 IPs, /home//Users paths,
+# *.internal hosts) are always active and are NOT listed here.
+#
+# After editing, verify:  python3 publish-core/redactor.py --check <a-test-file>
+
+# ── Your hostnames / node names ──────────────────────────────────────────
+# \b(?:prod|staging|db|web)-host-\d+\b
+# \bmybox-01\b
+
+# ── Your internal repos / products / services ────────────────────────────
+# \b(?:acme-platform|acme-core|internal-service)\b
+
+# ── Your business / client identities (acronyms: add \b and they match as-is) ─
+# \bACME\b
+# \bAcme Corp\b
+# \bBig Client Inc\b
+
+# ── Your internal email domains (your PUBLIC identity stays allowed) ──────
+# [A-Za-z0-9._%+-]+@(?:yourcompany|internal|corp)\.com
+
+# ── Your internal branch / ticket refs ───────────────────────────────────
+# \b(?:internal|private)/[A-Za-z0-9._/-]+\b
+# \b(?:JIRA|TICKET)-\d+\b
