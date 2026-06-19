@@ -69,24 +69,39 @@ _add("secret", r"\b[A-Za-z0-9_\-]{40,}\b")
 
 
 def _load_custom():
-    """Read the user's external denylist (one regex per line; # = comment)."""
-    pats = []
+    """Read the user's external denylist (one regex per line; # = comment).
+
+    Returns (patterns, errors) where errors is [(lineno, line, message)] for any
+    line that is not a valid regex. A malformed line is SKIPPED so a single typo
+    cannot crash the guard mid-publish — but the skip must never be silent: a
+    dropped denylist line is a HOLE in a fail-closed guard (the private noun it was
+    meant to catch would publish). `--check` surfaces every error loudly.
+    """
+    pats, errors = [], []
     try:
-        for ln in CUSTOM_PATH.read_text().splitlines():
-            ln = ln.strip()
-            if not ln or ln.startswith("#"):
+        for lineno, ln in enumerate(
+                CUSTOM_PATH.read_text(encoding="utf-8").splitlines(), 1):
+            s = ln.strip()
+            if not s or s.startswith("#"):
                 continue
             try:
-                pats.append(("custom", re.compile(ln, re.IGNORECASE)))
-            except re.error:
-                continue  # skip a malformed line rather than crash the guard
+                pats.append(("custom", re.compile(s, re.IGNORECASE)))
+            except re.error as exc:
+                errors.append((lineno, s, str(exc)))
     except OSError:
         pass
-    return pats
+    return pats, errors
 
 
 def active_patterns():
-    return _BUILTIN + _load_custom()
+    pats, _ = _load_custom()
+    return _BUILTIN + pats
+
+
+def custom_load_errors():
+    """Malformed (skipped) custom-denylist lines — surfaced loudly by --check so a
+    typo can't silently weaken a fail-closed guard."""
+    return _load_custom()[1]
 
 
 def _mask(s: str) -> str:
@@ -145,6 +160,11 @@ def main(argv) -> int:
         print(f"note: no custom denylist at {CUSTOM_PATH} — only built-in universal "
               "patterns are active (your hostnames/products/clients are NOT covered). "
               "Copy x-denylist.sample.txt there and edit it.", file=sys.stderr)
+    if mode == "--check" and CUSTOM_PATH.exists():
+        for lineno, bad, msg in custom_load_errors():
+            print(f"WARNING: denylist {CUSTOM_PATH} line {lineno} is not a valid regex "
+                  f"and was SKIPPED — your guard has a hole here until you fix it: "
+                  f"{bad!r} ({msg})", file=sys.stderr)
     text = _read_source(argv[1])
     if mode == "--redact":
         sys.stdout.write(redact(text))
