@@ -81,16 +81,23 @@ fetch is what proves the content is already world-readable.
 
 5. **Arm check + create.** A gist is a CODE surface, so it needs BOTH flags.
    - **DISARMED (default)** — the dry-run is the deliverable; report it and stop.
-   - **ARMED** (`touch` BOTH flags) — create live:
+   - **ARMED** (`touch` BOTH flags) — create live. The dry-run prints a `sha256=`
+     per file; pass it back via `--expect-sha256 <name>=<hex>` so the send is
+     bound to the exact bytes you reviewed (the default `main` ref can move
+     between the dry-run and the send):
      ```bash
      touch ~/.claude/state/publishers-armed
      touch ~/.claude/state/gist-publishers-armed
      python3 ~/.claude/skills/gist/publish-core/gist_client.py create \
-       --repo OWNER/REPO --path path/to/file.md --desc "..." --ack-public-hits --send
+       --repo OWNER/REPO --path path/to/file.md --desc "..." \
+       --expect-sha256 file.md=<sha256-from-dry-run> --ack-public-hits --send
      ```
-     The live path refuses if either flag is absent or the daily cap is reached.
-     On success it prints the gist URL, increments the cap, and writes a receipt
-     to `~/.claude/state/gist-receipts.jsonl`.
+     The live path refuses if either flag is absent, the daily cap is reached, or
+     the bytes drifted from `--expect-sha256`. On success it prints the gist URL,
+     increments the cap (reserved BEFORE the create so a crash can't leave an
+     uncounted public gist), and writes a receipt to
+     `~/.claude/state/gist-receipts.jsonl`. For maximum safety, pin `--ref` to an
+     immutable commit SHA instead of a branch.
 
 ## First run (smoke test before trusting it)
 

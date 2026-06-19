@@ -154,6 +154,14 @@ def test_gist_client():
     finally:
         gist_client.fetch_public = orig_fetch
 
+    # The plan carries a sha256 of the exact reviewed bytes.
+    import hashlib
+    body = "already public content\n"
+    plan = gist_client.build_plan({"f.md": body}, "o/r", "main", "d")
+    _check("plan-has-sha256",
+           plan["files"][0]["sha256"] == hashlib.sha256(body.encode()).hexdigest(),
+           f"sha={plan['files'][0]['sha256'][:12]}...")
+
 
 def test_gist_live_cap():
     """The LIVE --send path must enforce + increment the cap (network/gh mocked)."""
@@ -200,6 +208,51 @@ def test_gist_live_cap():
             common.GIST_RECEIPTS_PATH, common.NUDGE_LOG = orig_receipts, orig_nudge
 
 
+def test_gist_expect_sha():
+    """--expect-sha256 binds --send to reviewed bytes; drift refuses (exit 3)."""
+    print("gist_client (--expect-sha256 binding):")
+    import gist_client
+    import importlib
+    import hashlib
+    import cap_ledger
+
+    with tempfile.TemporaryDirectory() as td:
+        tdp = Path(td)
+        orig_caps = common.CAPS_PATH
+        orig_shared, orig_gist = common.ARM_FLAG_PATH, common.GIST_ARM_FLAG_PATH
+        orig_receipts, orig_nudge = common.GIST_RECEIPTS_PATH, common.NUDGE_LOG
+        orig_fetch, orig_create = gist_client.fetch_public, gist_client.create_gist
+        common.CAPS_PATH = tdp / "caps.json"
+        common.GIST_RECEIPTS_PATH = tdp / "gist-receipts.jsonl"
+        common.NUDGE_LOG = tdp / "nudge.log"
+        common.ARM_FLAG_PATH = tdp / "publishers-armed"
+        common.GIST_ARM_FLAG_PATH = tdp / "gist-publishers-armed"
+        common.ARM_FLAG_PATH.touch()
+        common.GIST_ARM_FLAG_PATH.touch()
+        importlib.reload(cap_ledger)
+
+        body = "reviewed bytes\n"
+        good = hashlib.sha256(body.encode()).hexdigest()
+        created = []
+        gist_client.fetch_public = lambda repo, ref, path, timeout=15: body
+        gist_client.create_gist = lambda files, desc: (created.append(1),
+                                                       "https://gist.github.com/mock/x")[1]
+        try:
+            base = ["create", "--repo", "o/r", "--path", "README.md", "--send"]
+            # Matching sha -> proceeds.
+            rc_ok = gist_client.main(base + ["--expect-sha256", f"README.md={good}"])
+            _check("expect-sha-match-sends", rc_ok == 0 and len(created) == 1, f"rc={rc_ok}")
+            # Mismatch (ref moved) -> refuse, no new create.
+            rc_bad = gist_client.main(base + ["--expect-sha256", "README.md=" + "0" * 64])
+            _check("expect-sha-mismatch-refused (exit 3)",
+                   rc_bad == 3 and len(created) == 1, f"rc={rc_bad} created={len(created)}")
+        finally:
+            gist_client.fetch_public, gist_client.create_gist = orig_fetch, orig_create
+            common.CAPS_PATH = orig_caps
+            common.ARM_FLAG_PATH, common.GIST_ARM_FLAG_PATH = orig_shared, orig_gist
+            common.GIST_RECEIPTS_PATH, common.NUDGE_LOG = orig_receipts, orig_nudge
+
+
 def main(argv) -> int:
     print("=== publish-core self-test ===")
     test_redactor_builtin()
@@ -207,6 +260,7 @@ def main(argv) -> int:
     test_cap_ledger()
     test_gist_client()
     test_gist_live_cap()
+    test_gist_expect_sha()
     failed = [n for n, ok in _results if not ok]
     print(f"\n{len(_results) - len(failed)}/{len(_results)} checks passed")
     if failed:

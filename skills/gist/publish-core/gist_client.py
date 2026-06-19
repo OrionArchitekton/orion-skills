@@ -29,7 +29,12 @@ Stdlib-only for the fetch (urllib); the create shells out to `gh gist create`.
 CLI:
   gist_client.py create --path <repo-path> [--path ...] \
       [--repo OWNER/REPO] [--ref main] [--filename <name>] \
-      [--desc "<description>"] [--ack-public-hits] [--send]
+      [--desc "<description>"] [--expect-sha256 <name>=<hex> ...] \
+      [--ack-public-hits] [--send]
+
+The dry-run prints a sha256 per file. Because the default ref (main) can move
+between the dry-run and a later --send, pass --expect-sha256 <name>=<hex> to bind
+the send to exactly the bytes you reviewed; the send refuses on any drift.
 
 The redactor is a BACKSTOP on this path, not the guard: the unauthenticated raw
 fetch already proved the content is world-readable, so an ABSTAIN is a false
@@ -40,6 +45,7 @@ passes --ack-public-hits to proceed (explicit + logged).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -137,6 +143,10 @@ def build_plan(files: dict, repo: str, ref: str, description: str) -> dict:
             "bytes": len(content.encode("utf-8")),
             "lines": content.count("\n") + (1 if content and not content.endswith("\n") else 0),
             "verdict": verdict,
+            # SHA-256 of the exact bytes that were fetched + reviewed. The dry-run
+            # prints this; --expect-sha256 binds a later --send to these bytes so a
+            # moving ref (e.g. main) can't publish content the human never saw.
+            "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
             "hit_classes": sorted({c for c, _ in hits}),
             # Keep the MASKED snippets (never raw secrets — redactor.scan masks
             # them) so a human can eyeball each matched value before --ack-public-hits.
@@ -156,10 +166,14 @@ def print_plan(plan: dict) -> None:
     for f in plan["files"]:
         print(f"    - {f['filename']}  ({f['bytes']}B, {f['lines']} lines)  "
               f"redactor={f['verdict']}")
+        print(f"        sha256={f['sha256']}")
         # Print each MASKED hit so a human can eyeball the actual matched value
         # (not just its class) before deciding to --ack-public-hits.
         for h in f.get("hits", []):
             print(f"        HIT [{h['class']}] {h['masked']}")
+    if any(f["verdict"] != "PUBLISH" for f in plan["files"]) or len(plan["files"]):
+        print("  To bind a later --send to exactly these reviewed bytes (in case the "
+              "source ref moves), pass --expect-sha256 <filename>=<sha256>.")
 
 
 def create_gist(files: dict, description: str) -> str:
@@ -189,12 +203,14 @@ def main(argv) -> int:
     if not argv or argv[0] != "create":
         print('usage: gist_client.py create --path <repo-path> [--path ...] '
               '[--repo OWNER/REPO] [--ref REF] [--filename N] [--desc "..."] '
-              '[--ack-public-hits] [--send]', file=sys.stderr)
+              '[--expect-sha256 <name>=<hex> ...] [--ack-public-hits] [--send]',
+              file=sys.stderr)
         return 2
 
     repo = os.environ.get("GIST_SOURCE_REPO", "")
     ref = os.environ.get("GIST_SOURCE_REF", "main")
     paths, filename, description, do_send, ack_hits = [], None, None, False, False
+    expect_sha = {}  # {filename: expected_sha256} binding --send to reviewed bytes
     i = 1
     while i < len(argv):
         a = argv[i]
@@ -208,6 +224,13 @@ def main(argv) -> int:
             filename = argv[i + 1]; i += 2
         elif a == "--desc" and i + 1 < len(argv):
             description = argv[i + 1]; i += 2
+        elif a == "--expect-sha256" and i + 1 < len(argv):
+            spec = argv[i + 1]
+            if "=" not in spec:
+                print("error: --expect-sha256 wants <filename>=<sha256>", file=sys.stderr)
+                return 2
+            k, v = spec.split("=", 1)
+            expect_sha[k] = v.strip().lower(); i += 2
         elif a == "--ack-public-hits":
             ack_hits = True; i += 1
         elif a == "--send":
@@ -291,8 +314,32 @@ def main(argv) -> int:
         common.log_line("gist send REFUSED reason=disarmed")
         return 0
 
-    # 5. Cap gate (fail-closed, in the LIVE path — not a separate manual step).
-    #    Read the prior count and refuse at cap BEFORE creating anything.
+    # 5. Bind --send to the reviewed bytes. The default ref (main) can move
+    #    between the dry-run and the send, which would publish content the human
+    #    never saw. If the operator pinned --expect-sha256 from the dry-run,
+    #    refuse unless the freshly-fetched bytes still hash to it.
+    if expect_sha:
+        by_name = {f["filename"]: f["sha256"] for f in plan["files"]}
+        for fn, want in expect_sha.items():
+            got = by_name.get(fn)
+            if got is None:
+                print(f"REFUSED: --expect-sha256 names {fn!r} but it is not in this "
+                      "gist's files. No gist created.", file=sys.stderr)
+                common.log_line(f"gist send REFUSED reason=expect-sha-unknown-file name={fn}")
+                return 3
+            if got != want:
+                print(f"REFUSED: {fn} changed since review (expected {want}, got {got}); "
+                      "the source ref moved. Re-run the dry-run and review again. "
+                      "No gist created.", file=sys.stderr)
+                common.log_line(f"gist send REFUSED reason=sha-mismatch name={fn}")
+                return 3
+
+    # 6. Cap gate (fail-closed, in the LIVE path — not a separate manual step).
+    #    RESERVE the slot (increment) BEFORE the irreversible create, so a crash
+    #    after `gh gist create` can never leave a public gist uncounted. The
+    #    increment itself re-reads prior state and refuses at cap. (A heavier
+    #    cross-process lock / pending-op journal is a possible future hardening;
+    #    this single-operator, human-gated CLI fails SAFE by over-counting.)
     import cap_ledger  # local sibling
     if cap_ledger.at_cap("gist"):
         cap = common.CAPS["gist"]
@@ -300,12 +347,11 @@ def main(argv) -> int:
               f"for {common.day_key()}). No gist created.", file=sys.stderr)
         common.log_line(f"gist send REFUSED reason=at-cap count={cap_ledger.current('gist')}/{cap}")
         return 4
+    reserved = cap_ledger.increment("gist")  # reserve before create (fail-safe)
 
     try:
         url = create_gist(files, description)
-        # Record the publish in the SAME live path (so repeated --send is capped).
-        new_count = cap_ledger.increment("gist")
-        common.log_line(f"gist send OK url={url} count={new_count}/{common.CAPS['gist']}")
+        common.log_line(f"gist send OK url={url} count={reserved}/{common.CAPS['gist']}")
         common.ensure_state_dir()
         with common.GIST_RECEIPTS_PATH.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps({"at": common.iso_z(), "url": url,
@@ -314,7 +360,10 @@ def main(argv) -> int:
         print(f"CREATED: {url}")
         return 0
     except Exception as exc:  # noqa: live subprocess/network error
-        common.log_line(f"gist send ERROR {type(exc).__name__}")
+        # The cap slot was reserved before the create (fail-safe): on failure it
+        # stays consumed rather than risk an uncounted public gist. Over-counting
+        # a 2/day cap is acceptable; an untracked public publish is not.
+        common.log_line(f"gist send ERROR {type(exc).__name__} (cap slot {reserved} kept)")
         print(f"CREATE ERROR: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
 
