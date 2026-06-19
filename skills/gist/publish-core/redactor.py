@@ -37,8 +37,10 @@ import re
 import sys
 from pathlib import Path
 
+# Resolve $HOME first (matches common.py) so containerized/test overrides apply.
+HOME = Path(os.environ.get("HOME", str(Path.home())))
 CUSTOM_PATH = Path(os.environ.get(
-    "X_DENYLIST_FILE", str(Path.home() / ".claude" / "config" / "x-denylist.txt")))
+    "X_DENYLIST_FILE", str(HOME / ".claude" / "config" / "x-denylist.txt")))
 
 _BUILTIN = []
 
@@ -72,7 +74,7 @@ def _load_custom():
     """Read the user's external denylist (one regex per line; # = comment)."""
     pats = []
     try:
-        for ln in CUSTOM_PATH.read_text().splitlines():
+        for ln in CUSTOM_PATH.read_text(encoding="utf-8").splitlines():
             ln = ln.strip()
             if not ln or ln.startswith("#"):
                 continue
@@ -126,7 +128,7 @@ def decision(text: str):
 def _read_source(arg: str) -> str:
     if arg == "-":
         return sys.stdin.read()
-    with open(arg, "r") as fh:
+    with open(arg, "r", encoding="utf-8") as fh:
         return fh.read()
 
 

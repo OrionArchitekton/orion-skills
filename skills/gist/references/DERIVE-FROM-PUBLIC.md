@@ -49,20 +49,22 @@ legitimate public docs, defeating its purpose. Silently down-grading the redacto
 to advisory would weaken the guard with no human in the loop. The ack is the
 middle path: fail-closed, with an explicit human gate.
 
-## Ship disarmed — and give a code surface its own arm flag
+## Ship disarmed — and give the code surface its own arm flag
 
-Like every publisher in this library, `/gist` ships **DISARMED**: a live create
-needs `--send` **and** the arm flag `~/.claude/state/publishers-armed`. The
-dry-run constructs and inspects the gist plan without ever creating it.
+Like every publisher in this library, `/gist` ships **DISARMED**: the dry-run
+constructs and inspects the gist plan without ever creating anything.
 
-If you run **several** publishers off one shared arm flag (e.g. an X poster and a
-gist publisher), harden further: give the **code** surface its **own** second
-flag, and require both. A new, higher-risk surface must not inherit "armed" from a
-flag you set for a lower-risk prose surface before the code surface existed. Then a
-live gist needs `is_armed()` *and* the gist-specific flag, while removing the
-shared flag still disarms everything. (`/gist` ships with the single-flag default
-because most installs run it standalone; the dual-flag pattern is a one-line
-addition in `common.py`.)
+Because a gist is a **code** surface — strictly higher-risk than a prose poster —
+`/gist` requires **two** arm flags by default, not one: the shared
+`~/.claude/state/publishers-armed` **and** the gist-specific
+`~/.claude/state/gist-publishers-armed`. A live create needs `--send` plus
+**both** flags (`is_gist_armed()`). This is the point: a new, higher-risk surface
+must not inherit "armed" from a flag you set for a lower-risk prose surface (e.g.
+`/x`) before the code surface existed. Arming `/x` never silently arms `/gist`;
+removing the shared flag still disarms everything. The dual-flag requirement lives
+in `common.py` (`is_gist_armed()`), and the live `--send` path also enforces the
+daily cap (`cap_ledger`) before creating and increments it on success — the cap is
+not a separate manual step you can forget.
 
 ## Why human-gated (`disable-model-invocation: true`)
 

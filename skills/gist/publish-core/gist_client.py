@@ -14,8 +14,10 @@ references/DERIVE-FROM-PUBLIC.md.
 SAFETY (same shape as the /x client):
   * Dry-run (default) fetches + redaction-checks + prints the gist SHAPE only
     (files / bytes / lines / verdict / description). It NEVER creates a gist.
-  * A live create requires --send AND the arm flag
-    (~/.claude/state/publishers-armed, absent by default). Disarmed -> refuse.
+  * A live create requires --send AND both arm flags (the shared
+    ~/.claude/state/publishers-armed AND the gist-specific
+    ~/.claude/state/gist-publishers-armed, both absent by default) AND room
+    under the daily cap. Disarmed or at-cap -> refuse.
   * Auth for the create is your existing `gh` token (needs the `gist` scope); no
     secret is read or printed here — `gh` handles it.
 
@@ -78,16 +80,42 @@ def fetch_public(repo: str, ref: str, path: str, timeout: int = 15) -> str:
                     f"raw fetch {url} resolved to {final_netloc} (status {resp.status}); "
                     f"refusing — the already-public proof requires a 200 from {RAW_NETLOC}"
                 )
-            return resp.read().decode("utf-8")
+            try:
+                return resp.read().decode("utf-8")
+            except UnicodeDecodeError as exc:
+                raise RuntimeError(
+                    f"raw fetch {url} returned binary or non-UTF-8 content; refusing "
+                    "(a gist publishes text — fetch the textual source path)"
+                ) from exc
     except urllib.error.HTTPError as exc:
         raise RuntimeError(
             f"raw fetch {url} -> HTTP {exc.code}: path/ref wrong or repo not public; "
             "refusing (derive-from-public requires a world-readable source)"
         ) from exc
+    except (urllib.error.URLError, OSError) as exc:
+        raise RuntimeError(
+            f"raw fetch {url} failed: {exc}; "
+            "refusing (derive-from-public requires a world-readable source)"
+        ) from exc
 
 
 def gist_filename(path: str, override: str | None) -> str:
-    return override if override else path.rstrip("/").split("/")[-1]
+    """Resolve the gist's display filename to a SINGLE base name.
+
+    The result is later joined onto a temp dir (`Path(td) / name`), so it must
+    never contain path components: an absolute path or a `../` segment would
+    escape the temp dir and overwrite a real local file with fetched content.
+    Reject anything that is not already a bare filename rather than silently
+    rewriting it.
+    """
+    fn = override if override else path.rstrip("/").split("/")[-1]
+    name = Path(fn).name
+    if not name or name in (".", "..") or name != fn:
+        raise ValueError(
+            f"invalid gist filename: {fn!r} "
+            "(must be a single filename with no path components)"
+        )
+    return name
 
 
 def redaction_ok(content: str):
@@ -134,10 +162,15 @@ def create_gist(files: dict, description: str) -> str:
     Returns the gist URL printed by gh. Auth is gh's own token (never printed).
     """
     with tempfile.TemporaryDirectory() as td:
+        td_resolved = Path(td).resolve()
         paths = []
         for name, content in files.items():
-            p = Path(td) / name
-            p.write_text(content)
+            p = (Path(td) / name).resolve()
+            # Defense-in-depth: gist_filename already rejects path components, but
+            # never let a key escape the temp dir and clobber a real local file.
+            if td_resolved not in p.parents:
+                raise ValueError(f"refusing unsafe gist filename: {name!r}")
+            p.write_text(content, encoding="utf-8")
             paths.append(str(p))
         cmd = ["gh", "gist", "create", "--public", "--desc", description, *paths]
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
@@ -226,17 +259,33 @@ def main(argv) -> int:
         print_plan(plan)
         return 0
 
-    # 4. Live create path (arm-gated).
-    if not common.is_armed():
-        print(f"REFUSED: --send requested but the system is DISARMED "
-              f"(arm flag absent: {common.ARM_FLAG_PATH}). No gist created.")
+    # 4. Live create path (dual-arm-gated). A gist is a CODE surface: it needs
+    #    BOTH the shared flag and its own gist-specific flag, so it never inherits
+    #    "armed" from a lower-risk prose publisher.
+    if not common.is_gist_armed():
+        print(f"REFUSED: --send requested but the gist surface is DISARMED. A live "
+              f"gist requires BOTH {common.ARM_FLAG_PATH} AND "
+              f"{common.GIST_ARM_FLAG_PATH}. No gist created.")
         common.log_line("gist send REFUSED reason=disarmed")
         return 0
+
+    # 5. Cap gate (fail-closed, in the LIVE path — not a separate manual step).
+    #    Read the prior count and refuse at cap BEFORE creating anything.
+    import cap_ledger  # local sibling
+    if cap_ledger.at_cap("gist"):
+        cap = common.CAPS["gist"]
+        print(f"REFUSED: gist daily cap reached ({cap_ledger.current('gist')}/{cap} "
+              f"for {common.day_key()}). No gist created.", file=sys.stderr)
+        common.log_line(f"gist send REFUSED reason=at-cap count={cap_ledger.current('gist')}/{cap}")
+        return 4
+
     try:
         url = create_gist(files, description)
-        common.log_line(f"gist send OK url={url}")
+        # Record the publish in the SAME live path (so repeated --send is capped).
+        new_count = cap_ledger.increment("gist")
+        common.log_line(f"gist send OK url={url} count={new_count}/{common.CAPS['gist']}")
         common.ensure_state_dir()
-        with common.GIST_RECEIPTS_PATH.open("a") as fh:
+        with common.GIST_RECEIPTS_PATH.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps({"at": common.iso_z(), "url": url,
                                  "repo": repo, "ref": ref,
                                  "files": list(files.keys())}) + "\n")

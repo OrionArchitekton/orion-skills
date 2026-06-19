@@ -110,17 +110,75 @@ def test_gist_client():
     _check("backstop-passes-on-clean", plan["clean"] is True,
            f"verdicts={[f['verdict'] for f in plan['files']]}")
 
-    # Arm gate: a live create needs the arm flag.
+    # Dual-arm gate: a gist (CODE surface) needs BOTH the shared flag AND its own.
     with tempfile.TemporaryDirectory() as td:
-        orig = common.ARM_FLAG_PATH
-        flag = Path(td) / "publishers-armed"
-        common.ARM_FLAG_PATH = flag
+        orig_shared, orig_gist = common.ARM_FLAG_PATH, common.GIST_ARM_FLAG_PATH
+        shared = Path(td) / "publishers-armed"
+        gist_flag = Path(td) / "gist-publishers-armed"
+        common.ARM_FLAG_PATH = shared
+        common.GIST_ARM_FLAG_PATH = gist_flag
         try:
-            _check("gate-disarmed", common.is_armed() is False)
-            flag.touch()
-            _check("gate-armed", common.is_armed() is True)
+            _check("gate-disarmed", common.is_gist_armed() is False)
+            shared.touch()  # shared armed alone must NOT arm the gist surface
+            _check("gate-shared-only-not-armed", common.is_gist_armed() is False)
+            gist_flag.touch()
+            _check("gate-both-armed", common.is_gist_armed() is True)
         finally:
-            common.ARM_FLAG_PATH = orig
+            common.ARM_FLAG_PATH, common.GIST_ARM_FLAG_PATH = orig_shared, orig_gist
+
+    # Filename sanitization: traversal / absolute / path components are rejected.
+    _check("filename-ok-basename", gist_client.gist_filename("a/b/c.md", None) == "c.md")
+    for bad in ("../escape.md", "/etc/passwd", "sub/dir.md", ".", ".."):
+        try:
+            gist_client.gist_filename("x.md", bad)
+            _check(f"filename-rejects[{bad}]", False, "did not raise")
+        except ValueError:
+            _check(f"filename-rejects[{bad}]", True)
+
+
+def test_gist_live_cap():
+    """The LIVE --send path must enforce + increment the cap (network/gh mocked)."""
+    print("gist_client (live cap enforcement):")
+    import gist_client
+    import importlib
+    import cap_ledger
+
+    with tempfile.TemporaryDirectory() as td:
+        tdp = Path(td)
+        orig_caps = common.CAPS_PATH
+        orig_shared, orig_gist = common.ARM_FLAG_PATH, common.GIST_ARM_FLAG_PATH
+        orig_receipts, orig_nudge = common.GIST_RECEIPTS_PATH, common.NUDGE_LOG
+        orig_fetch, orig_create = gist_client.fetch_public, gist_client.create_gist
+        common.CAPS_PATH = tdp / "caps.json"
+        common.GIST_RECEIPTS_PATH = tdp / "gist-receipts.jsonl"
+        common.NUDGE_LOG = tdp / "nudge.log"
+        common.ARM_FLAG_PATH = tdp / "publishers-armed"
+        common.GIST_ARM_FLAG_PATH = tdp / "gist-publishers-armed"
+        common.ARM_FLAG_PATH.touch()
+        common.GIST_ARM_FLAG_PATH.touch()
+        importlib.reload(cap_ledger)  # rebind cap_ledger to the temp CAPS_PATH
+
+        created = []
+        gist_client.fetch_public = lambda repo, ref, path, timeout=15: "already public content\n"
+        gist_client.create_gist = lambda files, desc: (created.append(1),
+                                                       f"https://gist.github.com/mock/{len(created)}")[1]
+        try:
+            cap = common.CAPS["gist"]
+            args = ["create", "--repo", "owner/repo", "--path", "README.md", "--send"]
+            rcs = [gist_client.main(args) for _ in range(cap)]
+            _check("live-send-under-cap-ok", all(rc == 0 for rc in rcs) and len(created) == cap,
+                   f"rcs={rcs} created={len(created)}")
+            _check("live-send-recorded-cap", cap_ledger.current("gist") == cap,
+                   f"ledger={cap_ledger.current('gist')}/{cap}")
+            rc_over = gist_client.main(args)  # the (cap+1)th send
+            _check("live-send-at-cap-refused (exit 4)",
+                   rc_over == 4 and len(created) == cap,
+                   f"rc={rc_over} created={len(created)}")
+        finally:
+            gist_client.fetch_public, gist_client.create_gist = orig_fetch, orig_create
+            common.CAPS_PATH = orig_caps
+            common.ARM_FLAG_PATH, common.GIST_ARM_FLAG_PATH = orig_shared, orig_gist
+            common.GIST_RECEIPTS_PATH, common.NUDGE_LOG = orig_receipts, orig_nudge
 
 
 def main(argv) -> int:
@@ -129,6 +187,7 @@ def main(argv) -> int:
     test_redactor_custom_loader()
     test_cap_ledger()
     test_gist_client()
+    test_gist_live_cap()
     failed = [n for n, ok in _results if not ok]
     print(f"\n{len(_results) - len(failed)}/{len(_results)} checks passed")
     if failed:

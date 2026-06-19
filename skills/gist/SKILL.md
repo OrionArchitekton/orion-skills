@@ -4,7 +4,8 @@ description: |
   Publish an embeddable PUBLIC GitHub gist of material that is ALREADY public — a
   path in a public repo, fetched over the unauthenticated raw URL so its
   world-readability is a structural fact, not a promise. The shared redactor runs
-  as a backstop, a per-day cap applies, and it ships DISARMED behind an arm flag.
+  as a backstop, a per-day cap is enforced in the live path, and it ships DISARMED
+  behind a dual arm flag (a shared flag plus a gist-specific one).
   A gist is a code surface, so this is human-gated: it does not auto-fire and does
   not auto-publish. Use for "make a gist of <public file>", "embeddable gist", "/gist".
 disable-model-invocation: true
@@ -30,8 +31,8 @@ reviews the dry-run, and sends. It never auto-fires and never auto-publishes.
 
 - Gist client: `publish-core/gist_client.py` — fetch public raw URL → backstop → dry-run by default
 - Redactor:    `publish-core/redactor.py` — backstop; built-in universal patterns + your denylist
-- Cap ledger:  `publish-core/cap_ledger.py` — surface `gist` (cap from `$GIST_DAILY_CAP`, default 2)
-- Arm flag:    `~/.claude/state/publishers-armed` (absent = DISARMED)
+- Cap ledger:  `publish-core/cap_ledger.py` — surface `gist` (cap from `$GIST_DAILY_CAP`, default 2); enforced + incremented automatically in the live `--send` path
+- Arm flags:   `~/.claude/state/publishers-armed` AND `~/.claude/state/gist-publishers-armed` (a live gist needs BOTH; either absent = DISARMED)
 - Self-test:   `publish-core/selftest.py` — proves the guards before you trust them
 
 ## Auth
@@ -71,24 +72,25 @@ fetch is what proves the content is already world-readable.
    **Never ack a hit you have not read.** A hit that looks like a real secret
    means a leak is already live in the public repo and must be fixed there first.
 
-4. **Cap check:**
+4. **Cap check (optional preview).** The live `--send` path enforces the cap
+   itself (refuses with exit 4 at cap, increments on success), so this is just a
+   way to see remaining room before you send:
    ```bash
-   python3 ~/.claude/skills/gist/publish-core/cap_ledger.py check gist   # exit 4 = stop
+   python3 ~/.claude/skills/gist/publish-core/cap_ledger.py check gist   # exit 4 = at cap
    ```
 
-5. **Arm check + create.**
+5. **Arm check + create.** A gist is a CODE surface, so it needs BOTH flags.
    - **DISARMED (default)** — the dry-run is the deliverable; report it and stop.
-   - **ARMED** (`touch ~/.claude/state/publishers-armed`) — create live:
+   - **ARMED** (`touch` BOTH flags) — create live:
      ```bash
+     touch ~/.claude/state/publishers-armed
+     touch ~/.claude/state/gist-publishers-armed
      python3 ~/.claude/skills/gist/publish-core/gist_client.py create \
        --repo OWNER/REPO --path path/to/file.md --desc "..." --ack-public-hits --send
      ```
-     Prints the gist URL; writes a receipt to `~/.claude/state/gist-receipts.jsonl`.
-
-6. **On a successful live create**, record the cap:
-   ```bash
-   python3 ~/.claude/skills/gist/publish-core/cap_ledger.py incr gist
-   ```
+     The live path refuses if either flag is absent or the daily cap is reached.
+     On success it prints the gist URL, increments the cap, and writes a receipt
+     to `~/.claude/state/gist-receipts.jsonl`.
 
 ## First run (smoke test before trusting it)
 
@@ -101,9 +103,10 @@ python3 ~/.claude/skills/gist/publish-core/selftest.py
 # 3. dry-run against a public path (no gh needed, nothing created):
 python3 ~/.claude/skills/gist/publish-core/gist_client.py create \
   --repo OWNER/REPO --path README.md --desc "test"
-# 4. arm + first live gist, then verify it on gist.github.com:
+# 4. arm (BOTH flags) + first live gist, then verify it on gist.github.com:
 gh auth refresh -s gist          # if your token lacks the gist scope
 touch ~/.claude/state/publishers-armed
+touch ~/.claude/state/gist-publishers-armed
 python3 ~/.claude/skills/gist/publish-core/gist_client.py create \
   --repo OWNER/REPO --path README.md --desc "test" --send
 ```
@@ -116,6 +119,7 @@ python3 ~/.claude/skills/gist/publish-core/gist_client.py create \
 - Human-gated: never auto-fire, never auto-send. A human reviews the dry-run.
 - Never `--ack-public-hits` a redactor hit you have not eyeballed and confirmed is
   a benign already-public token.
-- DISARMED → no create, ever. If you run several publishers off one arm flag,
-  give this code surface its own second flag — see `references/DERIVE-FROM-PUBLIC.md`.
+- DISARMED → no create, ever. A live gist needs BOTH the shared flag and the
+  gist-specific flag, so arming a prose publisher (e.g. /x) never silently arms
+  the gist code surface — see `references/DERIVE-FROM-PUBLIC.md`.
 - Never print a token/secret value (the client and `gh` both avoid this — keep it).

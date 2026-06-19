@@ -22,6 +22,10 @@ STATE_DIR = HOME / ".claude" / "state"
 CAPS_PATH = STATE_DIR / "publish-caps.json"
 PROCESSED_PATH = STATE_DIR / "publish-processed.json"
 ARM_FLAG_PATH = STATE_DIR / "publishers-armed"
+# A gist is a CODE surface — higher-risk than prose. It must NOT inherit "armed"
+# from the shared flag a lower-risk prose surface (e.g. /x) set before gist
+# existed. A live gist therefore requires BOTH flags (see is_gist_armed()).
+GIST_ARM_FLAG_PATH = STATE_DIR / "gist-publishers-armed"
 GIST_RECEIPTS_PATH = STATE_DIR / "gist-receipts.jsonl"
 NUDGE_LOG = STATE_DIR / "publish-nudge.log"
 
@@ -71,22 +75,35 @@ def ensure_state_dir() -> None:
 
 
 def is_armed() -> bool:
-    """The system ships DISARMED: the arm-flag file is absent by default.
+    """The shared arm flag: the system ships DISARMED (file absent by default).
 
     Live-create paths MUST check this; dry-run never does. Arm with
     `touch ~/.claude/state/publishers-armed` after your first manual smoke test;
     disarm by removing it.
 
-    If you run several publishers off this one flag, consider giving a CODE
-    surface (like gist) its own second flag so it can't inherit "armed" from a
-    prose surface — see references/DERIVE-FROM-PUBLIC.md.
+    NOTE: a CODE surface (like gist) requires a SECOND, surface-specific flag on
+    top of this one so it can't inherit "armed" from a lower-risk prose surface —
+    see is_gist_armed() and references/DERIVE-FROM-PUBLIC.md.
     """
     return ARM_FLAG_PATH.exists()
 
 
+def is_gist_armed() -> bool:
+    """A live gist requires BOTH the shared flag AND its own flag.
+
+    A gist publishes CODE to the public internet under your account — a strictly
+    higher-risk surface than a prose poster. Requiring a gist-specific flag means
+    arming /x (or any prose publisher) never silently arms gist; removing the
+    shared flag still disarms everything. Arm a live gist with BOTH:
+        touch ~/.claude/state/publishers-armed
+        touch ~/.claude/state/gist-publishers-armed
+    """
+    return ARM_FLAG_PATH.exists() and GIST_ARM_FLAG_PATH.exists()
+
+
 def read_json(path: Path, default):
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return default
 
@@ -94,7 +111,7 @@ def read_json(path: Path, default):
 def write_json(path: Path, obj) -> None:
     ensure_state_dir()
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(obj, indent=2, sort_keys=True) + "\n")
+    tmp.write_text(json.dumps(obj, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     tmp.replace(path)
 
 
@@ -103,7 +120,7 @@ def log_line(message: str) -> None:
     must not masquerade as success)."""
     ensure_state_dir()
     try:
-        with NUDGE_LOG.open("a") as fh:
+        with NUDGE_LOG.open("a", encoding="utf-8") as fh:
             fh.write(f"{iso_z()} {message}\n")
     except OSError:
         pass
