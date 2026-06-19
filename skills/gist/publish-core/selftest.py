@@ -61,7 +61,10 @@ def test_redactor_custom_loader():
     print("redactor (custom denylist file):")
     with tempfile.TemporaryDirectory() as td:
         cfg = Path(td) / "x-denylist.txt"
-        cfg.write_text("# my org\n\\bACME\\b\nmybox-01\n")
+        # last line is a malformed regex (unterminated character set) — it must be
+        # SKIPPED (the valid lines still load) but surfaced as a load error, not
+        # silently dropped (a silent skip is a hole in a fail-closed guard).
+        cfg.write_text("# my org\n\\bACME\\b\nmybox-01\n[unclosed\n")
         orig = redactor.CUSTOM_PATH
         redactor.CUSTOM_PATH = cfg
         try:
@@ -71,6 +74,11 @@ def test_redactor_custom_loader():
             _check("custom-term-host", v2 == "ABSTAIN" and any(c == "custom" for c, _ in h2))
             v3, _ = redactor.decision("we shipped the feature on schedule")
             _check("non-listed-publishes", v3 == "PUBLISH")
+            # the malformed line is reported (fail-closed: never a silent skip)
+            errs = redactor.custom_load_errors()
+            _check("malformed-line-surfaced",
+                   len(errs) == 1 and errs[0][1] == "[unclosed",
+                   f"errors={errs}")
         finally:
             redactor.CUSTOM_PATH = orig
 
@@ -161,6 +169,13 @@ def test_gist_client():
     _check("plan-has-sha256",
            plan["files"][0]["sha256"] == hashlib.sha256(body.encode()).hexdigest(),
            f"sha={plan['files'][0]['sha256'][:12]}...")
+
+    # Movable-ref detection (drives the unpinned-send warning): a full commit SHA
+    # is immutable; a branch/tag is not.
+    _check("immutable-ref-sha1", gist_client.is_immutable_ref("a" * 40) is True)
+    _check("immutable-ref-sha256", gist_client.is_immutable_ref("0" * 64) is True)
+    _check("movable-ref-branch", gist_client.is_immutable_ref("main") is False)
+    _check("movable-ref-shortsha", gist_client.is_immutable_ref("abc1234") is False)
 
 
 def test_gist_live_cap():

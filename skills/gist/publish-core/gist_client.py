@@ -48,6 +48,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -60,6 +61,12 @@ import common
 
 RAW_HOST = "https://raw.githubusercontent.com"
 RAW_NETLOC = "raw.githubusercontent.com"
+
+
+def is_immutable_ref(ref: str) -> bool:
+    """A full commit SHA (40-hex sha1 or 64-hex sha256) is immutable; a branch or
+    tag (e.g. 'main') can move between the dry-run and a later --send."""
+    return bool(re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", ref.lower()))
 
 
 def raw_url(repo: str, ref: str, path: str) -> str:
@@ -313,6 +320,16 @@ def main(argv) -> int:
               f"{common.GIST_ARM_FLAG_PATH}. No gist created.")
         common.log_line("gist send REFUSED reason=disarmed")
         return 0
+
+    # Warn (don't block) when sending UNPINNED from a movable ref: the bytes may
+    # have changed since the dry-run review. --expect-sha256 or an immutable commit
+    # SHA as --ref removes the gap.
+    if not expect_sha and not is_immutable_ref(ref):
+        print(f"WARNING: sending without --expect-sha256 and ref {ref!r} can move — "
+              "the published bytes may differ from the dry-run you reviewed. Pin with "
+              "--expect-sha256 <name>=<sha256> (printed by the dry-run) or pass an "
+              "immutable commit SHA as --ref.", file=sys.stderr)
+        common.log_line(f"gist send WARN unpinned ref={ref}")
 
     # 5. Bind --send to the reviewed bytes. The default ref (main) can move
     #    between the dry-run and the send, which would publish content the human
