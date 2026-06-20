@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import contextlib
 import datetime as _dt
-import fcntl
 import json
 import os
 from pathlib import Path
@@ -104,16 +103,28 @@ def cap_lock():
     The ledger is a read-modify-write on one JSON file shared by every surface and
     every concurrent session. Without a lock, two sends can both read prior=N and
     both write N+1 — a lost update that over-publishes. flock on a dedicated lock
-    file makes check+increment atomic across processes. POSIX (Linux/macOS).
+    file makes check+increment atomic across processes.
+
+    POSIX (Linux/macOS) gets real flock. fcntl is imported lazily so this module
+    still imports on non-POSIX platforms (e.g. Windows) for dry-runs/tests; there
+    the lock degrades to a no-op (single-machine concurrency on Windows is out of
+    scope for this harness). The lock file is opened in append mode so acquiring
+    the lock never truncates it.
     """
     ensure_state_dir()
-    fh = CAPS_LOCK_PATH.open("w")
     try:
-        fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+        import fcntl
+    except ImportError:
+        fcntl = None
+    fh = CAPS_LOCK_PATH.open("a")
+    try:
+        if fcntl is not None:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
         yield
     finally:
         try:
-            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+            if fcntl is not None:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
         finally:
             fh.close()
 

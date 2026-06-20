@@ -72,11 +72,14 @@ synthetic values, and a live send is impossible.
    confidential business logic, infra internals. If you can't genericize
    confidently, **stop** — never publish past an abstain.
 
-3. **Cap check:**
+3. **Cap pre-check (informational):**
    ```bash
    python3 ~/.claude/skills/x/publish-core/cap_ledger.py check x
    ```
    Exit 0 = room. Exit 4 = AT CAP → stop ("do not continue: X cap reached today").
+   This is a read-only heads-up only; the **authoritative** cap gate is the atomic
+   reservation the client makes on `--send` (step 4) — do **not** rely on this
+   check to enforce the cap (two concurrent sessions can both pass it).
 
 4. **Arm check + post.**
    - **DISARMED (default)** — run a DRY-RUN and report it's disarmed:
@@ -87,12 +90,12 @@ synthetic values, and a live send is impossible.
      ```bash
      python3 ~/.claude/skills/x/publish-core/x_client.py post --text "$TEXT" --send
      ```
-
-5. **On a successful live send**, record the cap (the client wrote its own receipt
-   to `~/.claude/state/x-receipts.jsonl`):
-   ```bash
-   python3 ~/.claude/skills/x/publish-core/cap_ledger.py incr x
-   ```
+   On `--send` the client **atomically reserves the cap slot before the POST**
+   (an `at_cap`-then-`incr` race would let two concurrent sessions both publish,
+   so the reservation is a single flock-guarded check-and-increment). At cap it
+   refuses with exit 4 and sends nothing. The client also records its own receipt
+   to `~/.claude/state/x-receipts.jsonl`. There is **no separate post-send
+   increment step** — the reservation already counted the publish.
 
 ## First run (smoke test before trusting autonomy)
 
