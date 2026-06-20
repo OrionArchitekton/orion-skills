@@ -85,8 +85,9 @@ def test_redactor_custom_loader():
 def test_cap_ledger():
     print("cap_ledger:")
     with tempfile.TemporaryDirectory() as td:
-        orig = common.CAPS_PATH
+        orig, orig_lock = common.CAPS_PATH, common.CAPS_LOCK_PATH
         common.CAPS_PATH = Path(td) / "caps.json"
+        common.CAPS_LOCK_PATH = Path(td) / "caps.lock"  # flock target; don't touch real state
         try:
             import importlib
             import cap_ledger
@@ -98,8 +99,10 @@ def test_cap_ledger():
             _check("at-cap-after-N", cap_ledger.at_cap("x") is True, f"current={cap_ledger.current('x')}/{cap}")
             rc = cap_ledger.main(["incr", "x"])
             _check("blocks-past-cap (exit 4)", rc == 4 and cap_ledger.current("x") == cap, f"rc={rc}")
+            # reserve() is the atomic check-and-increment: None at cap (no over-count).
+            _check("reserve-at-cap-returns-none", cap_ledger.reserve("x") is None)
         finally:
-            common.CAPS_PATH = orig
+            common.CAPS_PATH, common.CAPS_LOCK_PATH = orig, orig_lock
 
 
 def main(argv) -> int:

@@ -10,7 +10,9 @@ CAPS below; a per-day surface uses day_key(), a per-week surface uses week_key()
 """
 from __future__ import annotations
 
+import contextlib
 import datetime as _dt
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -20,6 +22,7 @@ STATE_DIR = HOME / ".claude" / "state"
 
 # State files.
 CAPS_PATH = STATE_DIR / "publish-caps.json"
+CAPS_LOCK_PATH = STATE_DIR / "publish-caps.lock"
 PROCESSED_PATH = STATE_DIR / "publish-processed.json"
 ARM_FLAG_PATH = STATE_DIR / "publishers-armed"
 X_RECEIPTS_PATH = STATE_DIR / "x-receipts.jsonl"
@@ -92,6 +95,27 @@ def write_json(path: Path, obj) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(obj, indent=2, sort_keys=True) + "\n")
     tmp.replace(path)
+
+
+@contextlib.contextmanager
+def cap_lock():
+    """Hold an exclusive cross-process lock for the cap ledger.
+
+    The ledger is a read-modify-write on one JSON file shared by every surface and
+    every concurrent session. Without a lock, two sends can both read prior=N and
+    both write N+1 — a lost update that over-publishes. flock on a dedicated lock
+    file makes check+increment atomic across processes. POSIX (Linux/macOS).
+    """
+    ensure_state_dir()
+    fh = CAPS_LOCK_PATH.open("w")
+    try:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+        yield
+    finally:
+        try:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+        finally:
+            fh.close()
 
 
 def log_line(message: str) -> None:
