@@ -352,19 +352,19 @@ def main(argv) -> int:
                 return 3
 
     # 6. Cap gate (fail-closed, in the LIVE path — not a separate manual step).
-    #    RESERVE the slot (increment) BEFORE the irreversible create, so a crash
-    #    after `gh gist create` can never leave a public gist uncounted. The
-    #    increment itself re-reads prior state and refuses at cap. (A heavier
-    #    cross-process lock / pending-op journal is a possible future hardening;
-    #    this single-operator, human-gated CLI fails SAFE by over-counting.)
+    #    RESERVE the slot BEFORE the irreversible create: reserve() is an atomic
+    #    check-and-increment under a cross-process flock, so two concurrent
+    #    --sends can't both pass the cap and both create. On a crash after
+    #    `gh gist create` the slot stays consumed — fail SAFE by over-counting
+    #    rather than leave a public gist uncounted.
     import cap_ledger  # local sibling
-    if cap_ledger.at_cap("gist"):
+    reserved = cap_ledger.reserve("gist")
+    if reserved is None:
         cap = common.CAPS["gist"]
         print(f"REFUSED: gist daily cap reached ({cap_ledger.current('gist')}/{cap} "
               f"for {common.day_key()}). No gist created.", file=sys.stderr)
         common.log_line(f"gist send REFUSED reason=at-cap count={cap_ledger.current('gist')}/{cap}")
         return 4
-    reserved = cap_ledger.increment("gist")  # reserve before create (fail-safe)
 
     try:
         url = create_gist(files, description)

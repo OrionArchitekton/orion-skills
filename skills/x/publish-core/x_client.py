@@ -147,19 +147,39 @@ def main(argv) -> int:
               "(populate them via your secrets manager / env). No tweet sent.")
         common.log_line("x send REFUSED reason=no-real-creds")
         return 0
+
+    # Cap gate (fail-closed, in the LIVE path — not a separate manual step).
+    # RESERVE the slot BEFORE the irreversible POST: reserve() is an atomic
+    # check-and-increment under a cross-process flock, so two concurrent --sends
+    # can't both pass the cap and both publish. On an error after send() the slot
+    # stays consumed — fail SAFE by over-counting rather than leave a tweet
+    # uncounted. (Same shape as the gist path.)
+    import cap_ledger  # local sibling
+    reserved = cap_ledger.reserve("x")
+    if reserved is None:
+        cap = common.CAPS["x"]
+        print(f"REFUSED: X daily cap reached ({cap_ledger.current('x')}/{cap} "
+              f"for {common.day_key()}). No tweet sent.", file=sys.stderr)
+        common.log_line(f"x send REFUSED reason=at-cap count={cap_ledger.current('x')}/{cap}")
+        return 4
+
     try:
         result = send(req)
-        common.log_line(f"x send OK status={result['status']}")
+        common.log_line(f"x send OK status={result['status']} count={reserved}/{common.CAPS['x']}")
         common.ensure_state_dir()
         with common.X_RECEIPTS_PATH.open("a") as fh:
             fh.write(json.dumps({"at": common.iso_z(), "status": result["status"], "chars": len(text)}) + "\n")
         print(f"SENT: status={result['status']}")
         return 0
     except Exception as exc:  # noqa: live network error
-        common.log_line(f"x send ERROR {type(exc).__name__}")
+        # The cap slot was reserved before the POST (fail-safe): on failure it
+        # stays consumed rather than risk an uncounted public tweet. Over-counting
+        # a daily cap is acceptable; an untracked public publish is not.
+        common.log_line(f"x send ERROR {type(exc).__name__} (cap slot {reserved} kept)")
         print(f"SEND ERROR: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
 
 
 if __name__ == "__main__":
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     raise SystemExit(main(sys.argv[1:]))

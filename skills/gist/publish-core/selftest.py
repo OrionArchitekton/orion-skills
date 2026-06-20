@@ -86,8 +86,9 @@ def test_redactor_custom_loader():
 def test_cap_ledger():
     print("cap_ledger:")
     with tempfile.TemporaryDirectory() as td:
-        orig = common.CAPS_PATH
+        orig, orig_lock = common.CAPS_PATH, common.CAPS_LOCK_PATH
         common.CAPS_PATH = Path(td) / "caps.json"
+        common.CAPS_LOCK_PATH = Path(td) / "caps.lock"  # flock target; don't touch real state
         try:
             import importlib
             import cap_ledger
@@ -100,8 +101,10 @@ def test_cap_ledger():
                    f"current={cap_ledger.current('gist')}/{cap}")
             rc = cap_ledger.main(["incr", "gist"])
             _check("blocks-past-cap (exit 4)", rc == 4 and cap_ledger.current("gist") == cap, f"rc={rc}")
+            # reserve() is the atomic check-and-increment: None at cap (no over-count).
+            _check("reserve-at-cap-returns-none", cap_ledger.reserve("gist") is None)
         finally:
-            common.CAPS_PATH = orig
+            common.CAPS_PATH, common.CAPS_LOCK_PATH = orig, orig_lock
 
 
 def test_gist_client():
@@ -187,11 +190,12 @@ def test_gist_live_cap():
 
     with tempfile.TemporaryDirectory() as td:
         tdp = Path(td)
-        orig_caps = common.CAPS_PATH
+        orig_caps, orig_lock = common.CAPS_PATH, common.CAPS_LOCK_PATH
         orig_shared, orig_gist = common.ARM_FLAG_PATH, common.GIST_ARM_FLAG_PATH
         orig_receipts, orig_nudge = common.GIST_RECEIPTS_PATH, common.NUDGE_LOG
         orig_fetch, orig_create = gist_client.fetch_public, gist_client.create_gist
         common.CAPS_PATH = tdp / "caps.json"
+        common.CAPS_LOCK_PATH = tdp / "caps.lock"  # flock target; don't touch real state
         common.GIST_RECEIPTS_PATH = tdp / "gist-receipts.jsonl"
         common.NUDGE_LOG = tdp / "nudge.log"
         common.ARM_FLAG_PATH = tdp / "publishers-armed"
@@ -218,7 +222,7 @@ def test_gist_live_cap():
                    f"rc={rc_over} created={len(created)}")
         finally:
             gist_client.fetch_public, gist_client.create_gist = orig_fetch, orig_create
-            common.CAPS_PATH = orig_caps
+            common.CAPS_PATH, common.CAPS_LOCK_PATH = orig_caps, orig_lock
             common.ARM_FLAG_PATH, common.GIST_ARM_FLAG_PATH = orig_shared, orig_gist
             common.GIST_RECEIPTS_PATH, common.NUDGE_LOG = orig_receipts, orig_nudge
 
@@ -233,11 +237,12 @@ def test_gist_expect_sha():
 
     with tempfile.TemporaryDirectory() as td:
         tdp = Path(td)
-        orig_caps = common.CAPS_PATH
+        orig_caps, orig_lock = common.CAPS_PATH, common.CAPS_LOCK_PATH
         orig_shared, orig_gist = common.ARM_FLAG_PATH, common.GIST_ARM_FLAG_PATH
         orig_receipts, orig_nudge = common.GIST_RECEIPTS_PATH, common.NUDGE_LOG
         orig_fetch, orig_create = gist_client.fetch_public, gist_client.create_gist
         common.CAPS_PATH = tdp / "caps.json"
+        common.CAPS_LOCK_PATH = tdp / "caps.lock"  # flock target; don't touch real state
         common.GIST_RECEIPTS_PATH = tdp / "gist-receipts.jsonl"
         common.NUDGE_LOG = tdp / "nudge.log"
         common.ARM_FLAG_PATH = tdp / "publishers-armed"
@@ -263,7 +268,7 @@ def test_gist_expect_sha():
                    rc_bad == 3 and len(created) == 1, f"rc={rc_bad} created={len(created)}")
         finally:
             gist_client.fetch_public, gist_client.create_gist = orig_fetch, orig_create
-            common.CAPS_PATH = orig_caps
+            common.CAPS_PATH, common.CAPS_LOCK_PATH = orig_caps, orig_lock
             common.ARM_FLAG_PATH, common.GIST_ARM_FLAG_PATH = orig_shared, orig_gist
             common.GIST_RECEIPTS_PATH, common.NUDGE_LOG = orig_receipts, orig_nudge
 
