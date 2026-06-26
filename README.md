@@ -47,6 +47,7 @@ their frontmatter.
 | [`pre-compact`](skills/pre-compact/SKILL.md) | Captures a session into a persistent, queryable context pack so a fresh instance resumes with zero re-derivation. Engine-agnostic. | Before `/compact`, near the context limit, or handing off in-progress work. |
 | [`x`](skills/x/SKILL.md) | Post to X (Twitter) — manually or autonomously — behind a fail-closed safety harness: a redactor that abstains rather than leak, a per-day cap, and an arm-flag so it ships DISARMED. Direct OAuth1.0a, stdlib-only. | An agent should publish a short note to X, safely — manual or hands-off. |
 | [`gist`](skills/gist/SKILL.md) | Publish an embeddable PUBLIC gist of ALREADY-public content — fetched over the unauthenticated raw URL so world-readability is structural, not a promise. Redactor backstop, per-day cap, ships DISARMED, human-gated. The safe pattern for a code surface. | You want to share/embed a file that is already in a public repo, safely. |
+| [`tdd-loop`](skills/tdd-loop/SKILL.md) | Drives a spec to a CI-green PR through a self-correcting RED→GREEN→REFACTOR loop where every "green" binds to an artifact — a computed non-empty diff fed to reviewers, a clean secret-scan report, a captured suite exit code — never self-report. Self-contained; the gates are harness-agnostic. | You're implementing a feature/bugfix that must land as a hardened PR with no failing tests or unreviewed security-sensitive changes. |
 
 ### Worked examples (one per skill)
 
@@ -85,6 +86,12 @@ their frontmatter.
   over the unauthenticated raw URL (a 200 proves it's already world-readable), runs the
   redactor backstop, and — only if you've armed the system — `gh gist create --public`s it;
   otherwise it prints the dry-run plan and creates nothing. Human-gated, ships DISARMED.
+- **`tdd-loop`** — "Implement the rate-limit feature and open a PR." The loop refuses to
+  start without a spec and a clean branch, drives one vertical slice at a time
+  (RED→GREEN→REFACTOR), then computes the diff and feeds *that* to a security +
+  adversarial review, re-asserts a clean secret-scan report, and captures the full-suite
+  exit code as the last action before the PR — each gate proven by an artifact you can
+  re-read, not "I checked".
 
 ## Authoring conventions
 
