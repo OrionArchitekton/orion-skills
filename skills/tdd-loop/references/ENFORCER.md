@@ -17,7 +17,9 @@ Never assume a particular orchestrator exists. The gates below are substrate-ind
 > they assume `errexit` (`set -e`) is OFF — the default for a normal shell / agent Bash
 > call. If you paste them into a `set -e` script, the script would abort at the failing
 > command *before* the guard runs (fail-OPEN). Wrap with `set +e` / `set -e`, or use
-> `if ! cmd; then rc=$?; else rc=0; fi`, so the gate still fires.
+> `if cmd; then rc=0; else rc=$?; fi`, so the gate still fires. (Do NOT write
+> `if ! cmd; then rc=$?; else rc=0; fi`: in the negated `then` branch `$?` is the status
+> of `! cmd`, i.e. `0` when `cmd` failed — that silently captures a failure as success.)
 
 ## Computing the diff the reviewers actually see (Review-ran gate)
 
