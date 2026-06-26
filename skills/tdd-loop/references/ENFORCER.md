@@ -13,29 +13,31 @@ deterministic workflow runner, or inline sequential work — you drive the loop 
 
 Never assume a particular orchestrator exists. The gates below are substrate-independent.
 
-> The capture blocks below intentionally inspect non-zero exit codes (`cmd; rc=$?`), so
-> they assume `errexit` (`set -e`) is OFF — the default for a normal shell / agent Bash
-> call. If you paste them into a `set -e` script, the script would abort at the failing
-> command *before* the guard runs (fail-OPEN). Wrap with `set +e` / `set -e`, or use
-> `if cmd; then rc=0; else rc=$?; fi`, so the gate still fires. (Do NOT write
-> `if ! cmd; then rc=$?; else rc=0; fi`: in the negated `then` branch `$?` is the status
-> of `! cmd`, i.e. `0` when `cmd` failed — that silently captures a failure as success.)
+> The capture blocks below use `if cmd; then rc=0; else rc=$?; fi` so they record a
+> non-zero exit AND survive `errexit` (`set -e`) — a bare `cmd; rc=$?` would abort at the
+> failing command before the guard runs (fail-OPEN). Avoid `if ! cmd; then rc=$?`: in the
+> negated `then` branch `$?` is the status of `! cmd` (i.e. `0` when `cmd` failed), which
+> silently captures a failure as success. Gate artifacts use `mktemp` (private, 0600,
+> collision-free) rather than predictable `/tmp` paths — the diff and report can hold
+> sensitive content.
 
 ## Computing the diff the reviewers actually see (Review-ran gate)
 
 ```bash
-# detect the base branch — repo PR convention first, else the remote's default HEAD
-BASE="$(git remote show origin | sed -n 's/.*HEAD branch: //p')"
+# base branch: honor a repo-declared PR base (AGENTS.md / CLAUDE.md / .claude) if you have one;
+# else resolve the remote default — local symref first (fast, offline-safe), then the network call.
+BASE="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')"
+[ -n "$BASE" ] || BASE="$(git remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p')"
 [ -n "$BASE" ] && [ "$BASE" != "(unknown)" ] || {
   echo "GATE FAIL: could not detect base branch (origin HEAD unset / offline). Try: git remote set-head origin -a"; exit 1; }
-# resolve against the remote-tracking ref so a fresh worktree (no LOCAL base branch) still works
 git rev-parse --verify --quiet "origin/$BASE" >/dev/null || {
   echo "GATE FAIL: base ref origin/$BASE not found (detached? unfetched?)"; exit 1; }
-git diff "origin/$BASE"...HEAD > /tmp/tdd-loop-review.diff
-test -s /tmp/tdd-loop-review.diff || { echo "GATE FAIL: diff is genuinely empty (no changes vs origin/$BASE)"; exit 1; }
+DIFF="$(mktemp)"   # private (0600) + collision-free; the diff can hold sensitive code
+git diff "origin/$BASE"...HEAD > "$DIFF"
+test -s "$DIFF" || { echo "GATE FAIL: diff is genuinely empty (no changes vs origin/$BASE)"; rm -f "$DIFF"; exit 1; }
 ```
 
-Feed `/tmp/tdd-loop-review.diff` (or the explicit changed-file list) to each reviewer. An
+Feed `$DIFF` (or the explicit changed-file list) to each reviewer. An
 empty/clean reviewer result on a NON-empty diff is a GATE FAILURE — re-dispatch with the
 diff actually attached.
 
@@ -70,10 +72,12 @@ Using [gitleaks](https://github.com/gitleaks/gitleaks) as the example scanner:
 
 ```bash
 # `gitleaks git --staged` is the current form (replaces the deprecated `protect --staged`)
-gitleaks git --staged --redact --report-path /tmp/tdd-loop-secrets.json; rc=$?
-# rc 0 = clean; rc 1 = leak found OR scan error (BOTH block — inspect the report + stderr to tell apart);
+REPORT="$(mktemp)"   # fresh, private path — no stale or world-readable report file
+# `if cmd; then rc=0; else rc=$?` captures the status AND survives `set -e`
+if gitleaks git --staged --redact --report-path "$REPORT"; then rc=0; else rc=$?; fi
+# rc 0 = clean; rc 1 = leak found OR scan error (BOTH block — inspect "$REPORT" + stderr to tell apart);
 # any other rc / missing report = scanner error => NOT green (a commit hook would fail OPEN here)
-test -f /tmp/tdd-loop-secrets.json || { echo "GATE FAIL: no secrets report produced"; exit 1; }
+test -f "$REPORT" || { echo "GATE FAIL: no secrets report produced"; exit 1; }
 [ "$rc" -eq 0 ] || { echo "GATE FAIL: scanner rc=$rc (leak or scan error)"; exit 1; }
 ```
 
@@ -83,8 +87,10 @@ stdout — the secret-to-stdout prohibition applies to the scanner's own output 
 ## Completion gate (full suite LAST, capture the exit code)
 
 ```bash
-<repo-declared test command> ; echo $? > /tmp/tdd-loop-suite.rc
-RC="$(cat /tmp/tdd-loop-suite.rc)"
+RCFILE="$(mktemp)"   # fresh file each run — never read a stale capture
+# `if cmd; then ... else ...` captures the suite status AND survives `set -e`
+if <repo-declared test command>; then echo 0 > "$RCFILE"; else echo $? > "$RCFILE"; fi
+RC="$(cat "$RCFILE")"
 [ "$RC" -eq 0 ] || { echo "GATE FAIL: suite rc=$RC"; exit 1; }
 ```
 
