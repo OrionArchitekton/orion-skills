@@ -48,8 +48,10 @@ either way.
 4. **IMPLEMENT** — drive the change to a CI-green PR through a self-correcting
    RED→GREEN loop with a BLOCKING adversarial + security review (`tdd-loop`). The agent
    OPENS the PR; it does not tag or merge.
-5. **OPERATOR GATES (human)** — push the version tag, merge the human-merged PR, change
-   DNS. The agent is incapable of these by construction.
+5. **OPERATOR GATES (human)** — **merge** the human-merged PR first, **then tag the
+   merged commit** on the default branch (order matters: a tag-triggered release must
+   build merged code, never a pre-merge branch head), then change DNS. The agent is
+   incapable of these by construction.
 6. **LAUNCH** — publish the public surface (microsite / product page), only if it
    changed.
 7. **VERIFY LIVE** — the installer's source of truth, live: the package index shows vN
@@ -63,11 +65,11 @@ either way.
   registry, merge a human-merged PR, push a tag, change DNS, arm a scheduled job, write
   a secret.** Make this fail-closed by construction (the agent literally cannot perform
   them), never a prose "please don't".
-- CODE work in a fresh worktree/branch off the repo's **detected default branch** (never
-  assume `main`, never the canonical checkout); never force-push.
+- Do CODE work in a fresh worktree/branch off the repo's **detected default branch**
+  (never assume `main`, never the canonical checkout); never force-push.
 - Scaffolding a microsite from a template: EXCLUDE the deploy-provider dir (e.g.
   `.vercel/`) — a leaked one can clobber the template's production project.
-- Never echo secrets; pass a secret-scan (e.g. gitleaks) before every commit.
+- Never echo secrets; pass a secret scan (e.g. gitleaks) before every commit.
   Severity-grade findings BLOCKING / WARNING / INFO.
 
 ## Red flags — STOP

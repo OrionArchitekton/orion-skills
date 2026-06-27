@@ -31,9 +31,15 @@ it. Convenience over re-typing.
    `timer-audit`).
 2. Locate the paired **implement** prompt/launcher you saved for that stem and print
    its fire line **verbatim** — that IS the command to run. A tiny report-only helper
-   that globs your prompts directory for `<stem>-implement-*` and prints the matching
-   launcher removes the friction; it reads and prints only — it fires nothing.
-3. The human reviews and fires it (editing the DO set inline first if the approval
+   that globs your prompts directory for `<stem>-implement-*` removes the friction; it
+   reads and prints only — it fires nothing.
+3. **Bind to the plan you just approved — never guess on ambiguity.** If more than one
+   launcher matches the stem, do NOT print one: list the candidates and **stop for the
+   human to pick the one tied to the approved plan** (matched by the plan's id / date /
+   sha). Do *not* auto-select "the newest" — that is not a binding to the approval and
+   can surface a stale or sibling launcher, exactly the failure this gate exists to
+   prevent.
+4. The human reviews and fires it (editing the DO set inline first if the approval
    changed it).
 
 ## Rails
@@ -41,6 +47,9 @@ it. Convenience over re-typing.
   deliberate fire.
 - The helper is **report-only** — it reads and prints; it writes nothing and runs
   nothing.
+- **Bind to the approval.** On more than one match, list the candidates and stop for
+  human selection; never auto-pick (not even "the newest") and never fire a launcher you
+  can't tie to the approval.
 - If no implement prompt exists yet, say so and point back to `goal-prompt` (build it
   first).
 
