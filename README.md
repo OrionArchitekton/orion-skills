@@ -48,6 +48,8 @@ their frontmatter.
 | [`x`](skills/x/SKILL.md) | Post to X (Twitter) — manually or autonomously — behind a fail-closed safety harness: a redactor that abstains rather than leak, a per-day cap, and an arm-flag so it ships DISARMED. Direct OAuth1.0a, stdlib-only. | An agent should publish a short note to X, safely — manual or hands-off. |
 | [`gist`](skills/gist/SKILL.md) | Publish an embeddable PUBLIC gist of ALREADY-public content — fetched over the unauthenticated raw URL so world-readability is structural, not a promise. Redactor backstop, per-day cap, ships DISARMED, human-gated. The safe pattern for a code surface. | You want to share/embed a file that is already in a public repo, safely. |
 | [`tdd-loop`](skills/tdd-loop/SKILL.md) | Drives a spec to a CI-green PR through a self-correcting RED→GREEN→REFACTOR loop where every "green" binds to an artifact — a computed non-empty diff fed to reviewers, a clean secret-scan report, a captured suite exit code — never self-report. Self-contained; the gates are harness-agnostic. | You're implementing a feature/bugfix that must land as a hardened PR with no failing tests or unreviewed security-sensitive changes. |
+| [`oss-loop`](skills/oss-loop/SKILL.md) | Carries an OSS tool from idea to a shipped, published release through one loop where the agent does everything reversible and a human touches only the irreversible gates — publish, merge, tag, DNS, secrets. Composes your prompt/research/TDD/launch skills; it does not reimplement them. | You're taking an OSS tool (or its next version) from spec to a published release hands-off, stopping at the irreversible gates. |
+| [`chain-launcher`](skills/chain-launcher/SKILL.md) | Surfaces the exact next command for the implement phase after you approve a research/decision plan — a frictionless hand-off that never auto-crosses the human approval gate. | You just approved a research/decision plan and want the implement-phase command without re-deriving it. |
 
 ### Worked examples (one per skill)
 
@@ -92,6 +94,16 @@ their frontmatter.
   adversarial review, re-asserts a clean secret-scan report, and captures the full-suite
   exit code as the last action before the PR — each gate proven by an artifact you can
   re-read, not "I checked".
+- **`oss-loop`** — "Ship v0.4 of my CLI." It builds the research prompt, you approve the
+  plan, and it drives the change to a CI-green PR via `tdd-loop` — then STOPS: tagging,
+  merging, and publishing to the package/image registry are *your* gates. After you merge
+  it verifies the package index actually shows v0.4 live (because "merged" is not
+  "published") and captures the lesson. The agent never crosses an irreversible gate.
+- **`chain-launcher`** — You just approved the plan from a research run and need the
+  implement step. Instead of re-typing the command, `chain-launcher <topic>` finds the
+  paired implement launcher you saved and prints its fire line verbatim — you eyeball it
+  and fire. It removes the friction of the hand-off without ever crossing the approval
+  gate for you.
 
 ## Authoring conventions
 
