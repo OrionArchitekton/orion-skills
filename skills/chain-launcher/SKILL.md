@@ -33,11 +33,12 @@ it. Convenience over re-typing.
    its fire line **verbatim** — that IS the command to run. A tiny report-only helper
    that globs your prompts directory for `<stem>-implement-*` removes the friction; it
    reads and prints only — it fires nothing.
-3. **Bind to the plan you just approved — do not guess on ambiguity.** If more than one
-   launcher matches the stem, do NOT print one blindly: list the matches and pick the
-   one tied to the approved plan (matched by the plan's id/date, or the newest), and
-   surface the ambiguity. Firing a stale or sibling launcher — one not bound to the
-   approval — is exactly the failure this gate exists to prevent.
+3. **Bind to the plan you just approved — never guess on ambiguity.** If more than one
+   launcher matches the stem, do NOT print one: list the candidates and **stop for the
+   human to pick the one tied to the approved plan** (matched by the plan's id / date /
+   sha). Do *not* auto-select "the newest" — that is not a binding to the approval and
+   can surface a stale or sibling launcher, exactly the failure this gate exists to
+   prevent.
 4. The human reviews and fires it (editing the DO set inline first if the approval
    changed it).
 
@@ -46,8 +47,9 @@ it. Convenience over re-typing.
   deliberate fire.
 - The helper is **report-only** — it reads and prints; it writes nothing and runs
   nothing.
-- **Bind to the approval.** On more than one match, surface the ambiguity and pick the
-  launcher tied to the approved plan; never fire one you can't tie to the approval.
+- **Bind to the approval.** On more than one match, list the candidates and stop for
+  human selection; never auto-pick (not even "the newest") and never fire a launcher you
+  can't tie to the approval.
 - If no implement prompt exists yet, say so and point back to `goal-prompt` (build it
   first).
 
