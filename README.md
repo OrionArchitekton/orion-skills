@@ -50,6 +50,7 @@ their frontmatter.
 | [`tdd-loop`](skills/tdd-loop/SKILL.md) | Drives a spec to a CI-green PR through a self-correcting RED→GREEN→REFACTOR loop where every "green" binds to an artifact — a computed non-empty diff fed to reviewers, a clean secret-scan report, a captured suite exit code — never self-report. Self-contained; the gates are harness-agnostic. | You're implementing a feature/bugfix that must land as a hardened PR with no failing tests or unreviewed security-sensitive changes. |
 | [`oss-loop`](skills/oss-loop/SKILL.md) | Carries an OSS tool from idea to a shipped, published release through one loop where the agent does everything reversible and a human touches only the irreversible gates — publish, merge, tag, DNS, secrets. Composes your prompt/research/TDD/launch skills; it does not reimplement them. | You're taking an OSS tool (or its next version) from spec to a published release hands-off, stopping at the irreversible gates. |
 | [`chain-launcher`](skills/chain-launcher/SKILL.md) | Surfaces the exact next command for the implement phase after you approve a research/decision plan — a frictionless hand-off that never auto-crosses the human approval gate. | You just approved a research/decision plan and want the implement-phase command without re-deriving it. |
+| [`tools-router`](skills/tools-router/SKILL.md) | A periodic recon builds a low-token, auth-aware index of the CLIs + MCP servers an agent can reach (preferring a *working* CLI over its MCP) and a thin fail-open hook injects it; redundancy is judged by which side actually works — never existence — and probe output is captured as redacted enums, never raw secrets. | The agent keeps being told which tool exists or which to use, and you want it to just know its surface. |
 
 ### Worked examples (one per skill)
 
@@ -104,6 +105,12 @@ their frontmatter.
   paired implement launcher you saved and prints its fire line verbatim — you eyeball it
   and fire. It removes the friction of the hand-off without ever crossing the approval
   gate for you.
+- **`tools-router`** — Your agent keeps being told "use the X CLI, not the Y MCP." A
+  periodic recon probes each tool's auth + each MCP's health and renders a compact table;
+  it recommends dropping a redundant MCP *only* when a working CLI covers it — and keeps a
+  live MCP whose CLI is logged out (flagging the CLI instead) — capturing auth as redacted
+  enums, never raw probe output. A fail-open hook injects the table at session start, so
+  the agent just knows its surface.
 
 ## Authoring conventions
 
