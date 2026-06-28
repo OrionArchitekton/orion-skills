@@ -105,6 +105,27 @@ or the Agent tool's `isolation: 'worktree'`. The worktree branches from the
 default branch and is auto-removed if the agent made no changes (zero residue);
 use it ONLY for parallel mutation (it costs setup time + disk per agent).
 
+**4. Abstention handling in verify/judge aggregation.** In a Workflow
+verify/judge fan-out, a lens that returns null / errored / rate-limited is an
+ABSTENTION, not a verdict. Bucket it as **PENDING** -- a third state distinct
+from ship/refute -- and RE-RUN that lens independently; never let the synthesis
+lead manually adjudicate it. Never fold a null lens into `refute` (which can
+silently bury real candidates) or into `ship` (which can pass unsupported
+candidates). In the script, use `.catch` to tag an item PENDING -- never
+`.catch(() => null)` plus `filter(Boolean)`, which silently drops the
+abstention. A discovery/verify run that ends with any PENDING items is not
+complete: surface the PENDING count alongside ship/refute and loop until it is
+zero. Pattern:
+
+```js
+const judged = await parallel(items.map(it => () =>
+  agent(verifyPrompt(it), {schema: VERDICT})
+    .then(v => ({it, state: v ? (v.real ? 'ship' : 'refute') : 'pending'}))
+    .catch(() => ({it, state: 'pending'}))))          // abstain -> PENDING, never dropped
+const pending = judged.filter(j => j.state === 'pending')
+// re-run `pending` independently; a non-empty pending pool means not done.
+```
+
 ## Shape-specific phases & rails
 
 **research+implement (default):**
