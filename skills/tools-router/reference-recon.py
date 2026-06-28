@@ -58,16 +58,18 @@ def probe_cli(name, runner=_run):
     return state, ""
 
 # --- fail-soft parse of a NON-machine-readable tool list. Pin to STATUS WORDS, not glyphs
-#     or column layout; unparseable rows -> 'unknown', never dropped. ----------------------
-_STATUS = [("Needs authentication", "needs_auth"), ("Failed", "failed"), ("Connected", "connected")]
+#     or column layout; a server row whose status we cannot recognize -> 'unknown', never dropped.
+_STATUS = {"Needs authentication": "needs_auth", "Failed": "failed", "Connected": "connected"}
 def parse_mcp_list(text):
     out = []
     for raw in text.splitlines():
         line = raw.rstrip()
-        if not line or ": " not in line or " - " not in line:
-            continue
+        if not line or ": " not in line:
+            continue  # blank / preamble — not a server row (no id separator)
         sid, rest = line.split(": ", 1)
-        status = next((enum for word, enum in _STATUS if rest.endswith(word)), "unknown")
+        # Do NOT also require a layout delimiter like " - ": a harness with a different
+        # column layout must still keep the row (as 'unknown'), never silently drop it.
+        status = next((enum for phrase, enum in _STATUS.items() if rest.endswith(phrase)), "unknown")
         out.append({"id": sid.strip(), "status": status})
     return out
 
@@ -86,17 +88,17 @@ def dedup(clis, mcps):
             continue
         state = clis.get(cli, {}).get("state", "not_installed")
         mcp_works = any(m["status"] == "connected" for m in matched)
-        cli_verified = state == "authed"
-        cli_present  = state in ("authed", "config_present")
+        cli_verified = state == "authed"        # config_present is NOT verified-working (a local
+                                                # read can't see a revoked key) -> never a drop basis
         if cli_verified and not mcp_works:
-            action = "disable_mcp"                # working CLI fully covers a dead MCP
-        elif cli_present and not mcp_works:
-            action = "disable_mcp_weak"           # CLI present but unverified -> verify the key is live first
+            action = "disable_mcp"                # a VERIFIED-working CLI covers a dead MCP -> safe to recommend drop
         elif mcp_works and not cli_verified:
             action = "flag_cli_unauthed"          # THE INVERSION: keep the working MCP, auth the CLI
         elif cli_verified and mcp_works:
             action = "note_overlap"               # both work -> human judgment, not an auto-kill
         else:
+            # neither side VERIFIED working (incl. config_present CLI + dead MCP): never recommend
+            # dropping a provider when nothing is confirmed to replace it -> verify before relying.
             action = "flag_surface"
         recs.append({"surface": surface, "action": action, "cli": cli})
     return recs
