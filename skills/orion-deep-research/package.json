@@ -1,0 +1,10 @@
+{
+  "name": "orion-deep-research",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Estate fork of the native /deep-research harness: honest verification accounting, a bounded reflect/knowledge-gap loop, and a durable quality-gated vault artifact. Pure-logic modules under lib/ are TDD-tested; the workflow inlines them (Workflow sandbox cannot import).",
+  "scripts": {
+    "test": "node --test lib/*.test.mjs"
+  }
+}

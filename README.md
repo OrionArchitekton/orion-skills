@@ -44,6 +44,7 @@ their frontmatter.
 | [`incident-as-code`](skills/incident-as-code/SKILL.md) | Closes a resolved incident by committing a `docs/solutions/` doc (and a runbook when recurrent) into the affected repo. | An incident is root-caused and fixed, or a postmortem is asked for. |
 | [`learn-capture`](skills/learn-capture/SKILL.md) | The compound loop's closing step: route accreted lessons to durable homes (agent memory vs repo `AGENTS.md`). | After a review, merge, or substantial task — "what did we learn?". |
 | [`goal-prompt`](skills/goal-prompt/SKILL.md) | Turns a loose task into a fire-ready autonomous goal prompt: recon-grounded, rails-locked, with a transcript-checkable terminal condition. Builds the prompt; never fires it. | You want to author a `/goal` or `/deep-research` prompt for a hands-off run. |
+| [`orion-deep-research`](skills/orion-deep-research/SKILL.md) | Fork of the native deep-research that adds honest abstention accounting (a rate-limited claim is `unverified`, never `refuted`), a bounded reflect/knowledge-gap loop, an independent judge-gate that quarantines inconclusive runs, and durable persistence of the cited report to a research vault. Self-contained; harness-agnostic. | You need a deep, multi-source, fact-checked report that must survive the session and be re-findable, not a throwaway answer. |
 | [`pre-compact`](skills/pre-compact/SKILL.md) | Captures a session into a persistent, queryable context pack so a fresh instance resumes with zero re-derivation. Engine-agnostic. | Before `/compact`, near the context limit, or handing off in-progress work. |
 | [`x`](skills/x/SKILL.md) | Post to X (Twitter) — manually or autonomously — behind a fail-closed safety harness: a redactor that abstains rather than leak, a per-day cap, and an arm-flag so it ships DISARMED. Direct OAuth1.0a, stdlib-only. | An agent should publish a short note to X, safely — manual or hands-off. |
 | [`gist`](skills/gist/SKILL.md) | Publish an embeddable PUBLIC gist of ALREADY-public content — fetched over the unauthenticated raw URL so world-readability is structural, not a promise. Redactor backstop, per-day cap, ships DISARMED, human-gated. The safe pattern for a code surface. | You want to share/embed a file that is already in a public repo, safely. |
@@ -78,6 +79,7 @@ their frontmatter.
   to correct false premises, assembles a phased read-only brief, and emits a terminal
   condition the small `/goal` evaluator can actually check — then hands you the exact
   `/goal` line to fire yourself.
+- **`orion-deep-research`**: "Research the state of X and save it." It fans out searches, verifies each claim by first-hand source reading, marks a rate-limited claim `unverified` (never `refuted`), reflects once to chase the gaps its own findings expose, then writes a cited report with a verification-provenance ledger.
 - **`pre-compact`** — Context is at 90%. The skill verifies what *actually* shipped
   (not what you remember), writes a decision-shaped pack to a durable directory, and points
   a `LATEST.md` at it so the next instance resumes from evidence, not narrative.
