@@ -75,7 +75,9 @@ over a missing spec, a dirty tree, or an unknown base branch.
    never forward to a speculative patch.
 6. **ADVERSARIAL + SECURITY SELF-REVIEW (mandatory)** — see *Enforcer gates* +
    *Security checklist*. Feed the computed diff to the reviewer roles; **BLOCKING
-   findings are HARD GATES**: fix, re-run the full suite, re-review.
+   findings are HARD GATES**: fix, re-run the full suite, re-review. PLUS advisory
+   computational sensors (mutation, behavioral, optional property-based) that RUN rather
+   than read the diff: they surface findings for judgment but never hard-block.
 7. **VERIFIED PR** — preflight (detect base branch, secret scan) → finish the branch →
    commit (passes the secret gate; never echo secrets; never force-push) → open the PR
    with test evidence + review summary → independent runtime verification (a green
@@ -106,6 +108,42 @@ the PR does not open while any BLOCKING finding is open OR the suite is red.**
 - **Completion gate** — run the FULL test suite as the LAST action before the PR,
   capture its exit code to a file, and quote it. A non-zero, stale, or absent capture =
   not green. No "done" without independent runtime verification.
+
+### Computational sensor gates (ADVISORY, complement the inferential reviewers)
+
+The reviewer roles above are *inferential* sensors: an LLM reading the diff. Complement
+them with *computational* sensors that actually RUN. These are advisory and
+severity-graded (WARNING / INFO), never hard gates: they surface findings for judgment
+and never stall the PR, and they ship advisory first (the advisory-then-blocking
+migration). Bind each verdict to a report artifact, not a self-assertion. A sensor that
+errors, times out, or cannot run is PENDING (an abstention), never a silent "clean", and
+PENDING never escalates to BLOCKING here.
+
+- **Mutation sensor.** Run a bounded, changed-files-scoped mutation pass (mutmut,
+  cosmic-ray, Stryker, or PIT, scoped to the slice's changed source) and read the result.
+  A surviving mutant means a test too weak or non-asserting to notice the change. Coverage
+  is an invalid quality proxy for agent-written tests; the mutation score is the
+  corrective computational signal. Keep it bounded (changed-files scope, a mutant cap,
+  per-run and total timeouts), because mutation testing is expensive. Surface surviving
+  mutants, add the missing assertion when the finding is real, never stall the PR on it.
+- **Behavioral sensor.** EXECUTE the artifact and judge its observed runtime behavior,
+  because agents can "build to the test" and leave the real deliverable dead while the
+  unit suite stays green. An interactive judge that runs the artifact resists the
+  reward-hacking a static diff/test-reader does not. Declare ONE acceptance scenario as an
+  explicit run command plus the observable outcome that proves it worked, run it, and read
+  the result: ran (exit 0) but the expected outcome absent means a green suite over a dead
+  or wrong deliverable. **Rule of Two:** this sensor executes the artifact's own untrusted
+  code, so bound it (a hard timeout, a process-group kill so a forked grandchild cannot
+  outlive it, a child env scrubbed of secret-shaped vars). Honest limit: a same-UID
+  process can still read the parent env and network egress is not blocked, so for genuinely
+  untrusted code run it under OS isolation (a container, a PID+mount namespace, or a
+  dedicated low-privilege UID) or where the parent holds no secrets.
+- **Property-based sensor (optional).** For the semantic-input bugs example-based tests
+  miss, add property-based testing (Hypothesis, fast-check) over library-shaped pure
+  functions. Test only properties a human DECLARED: auto-inferred properties carry a high
+  false-positive tax, so a declared-only sensor avoids flagging correct code. Opt-in and
+  advisory; scaffolding helps weaker agents and can distract a frontier model, so keep it
+  optional.
 
 **Iteration controller:** loop-until( full-suite green AND security-checklist green ),
 both proven by captured artifacts. Only then open the PR.
@@ -177,6 +215,7 @@ they bind to artifacts either way.
 | "The post-push CI/review pipeline will catch security — I'll skip it now" | That runs AFTER push; this is the pre-PR gate. Run security review on the computed diff BEFORE opening the PR. |
 | "The secret scanner exited without blocking" | It can fail OPEN on scan error/timeout. Assert a CLEAN report was actually produced. |
 | "Tests passed earlier, I'll call it done" | Run the FULL suite LAST; capture + quote the exit code. |
+| "Coverage is green, so the tests are strong" | Coverage is an invalid quality proxy for agent-written tests. Run a bounded mutation pass; a surviving mutant is a weak or non-asserting test. |
 | "I'll force-push to tidy the branch" | Never force-push by default. |
 | "I'm confident it's correct" | Confidence is not an artifact. Cite the captured exit code / report / git result. |
 
