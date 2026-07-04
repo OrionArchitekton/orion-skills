@@ -52,6 +52,9 @@ their frontmatter.
 | [`oss-loop`](skills/oss-loop/SKILL.md) | Carries an OSS tool from idea to a shipped, published release through one loop where the agent does everything reversible and a human touches only the irreversible gates — publish, merge, tag, DNS, secrets. Composes your prompt/research/TDD/launch skills; it does not reimplement them. | You're taking an OSS tool (or its next version) from spec to a published release hands-off, stopping at the irreversible gates. |
 | [`chain-launcher`](skills/chain-launcher/SKILL.md) | Surfaces the exact next command for the implement phase after you approve a research/decision plan — a frictionless hand-off that never auto-crosses the human approval gate. | You just approved a research/decision plan and want the implement-phase command without re-deriving it. |
 | [`tools-router`](skills/tools-router/SKILL.md) | A periodic recon builds a low-token, auth-aware index of the CLIs + MCP servers an agent can reach (preferring a *working* CLI over its MCP) and a thin fail-open hook injects it; redundancy is judged by which side actually works — never existence — and probe output is captured as redacted enums, never raw secrets. | The agent keeps being told which tool exists or which to use, and you want it to just know its surface. |
+| [`prove-deploy-is-live`](skills/prove-deploy-is-live/SKILL.md) | Proves a deploy is actually live via three proofs (version identity, real-route serve, end-to-end behavior), because green CI, `docker ps` healthy, and `/health` 200 all stay green while the running artifact is the old image or the real route is dead. | You are about to call a deploy/restart/cutover "live" or "fixed", or verifying someone else's "it's deployed" claim. |
+| [`prove-control-binds`](skills/prove-control-binds/SKILL.md) | Proves a gate, hook, monitor, or reaper actually fires by injecting a synthetic violation and watching it block from its own output, never by trusting a green check (green has two indistinguishable causes: nothing to catch, or catching nothing). | You are about to report a control "armed"/"protecting"/"done", or auditing one. |
+| [`design-fail-closed-gate`](skills/design-fail-closed-gate/SKILL.md) | Authors unattended and self-policed gates that fail CLOSED by construction: gate on a structured token not free-text prose, bind every green to a re-readable artifact, respect the harness's inverting exit-code semantics, and prove the gate denies before calling it armed. | You are authoring a PreToolUse/pre-commit/pre-push hook, secret scanner, CI merge gate, auto-reaper, or LLM self-review enforcer. |
 
 ### Worked examples (one per skill)
 
@@ -113,6 +116,18 @@ their frontmatter.
   live MCP whose CLI is logged out (flagging the CLI instead) — capturing auth as redacted
   enums, never raw probe output. A fail-open hook injects the table at session start, so
   the agent just knows its surface.
+- **`prove-deploy-is-live`**: You merged a PR, `docker ps` says healthy, and `/health`
+  returns 200, so you are about to report it live. This skill makes you hit the real
+  declared route and confirm the running image is the merge SHA first, catching the
+  container still on the old image before it pages you at 3am.
+- **`prove-control-binds`**: You installed a pre-commit secret scanner and CI is green.
+  This skill has you feed it a real-format `ghp_`-shaped token in a sandbox and watch it
+  actually block, so you can tell a working gate from one that scans nothing and passes
+  everything (green has two causes: nothing to catch, or catching nothing).
+- **`design-fail-closed-gate`**: You are writing a PreToolUse hook to block a destructive
+  command. This skill stops the silent fail-open trap (in Claude Code, an `exit 1` crash
+  lets the tool run anyway), showing the exit-code semantics and the structured-token gate
+  that make the safe verdict the structural default.
 
 ## Authoring conventions
 
