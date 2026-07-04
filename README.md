@@ -55,6 +55,7 @@ their frontmatter.
 | [`prove-deploy-is-live`](skills/prove-deploy-is-live/SKILL.md) | Proves a deploy is actually live via three proofs (version identity, real-route serve, end-to-end behavior), because green CI, `docker ps` healthy, and `/health` 200 all stay green while the running artifact is the old image or the real route is dead. | You are about to call a deploy/restart/cutover "live" or "fixed", or verifying someone else's "it's deployed" claim. |
 | [`prove-control-binds`](skills/prove-control-binds/SKILL.md) | Proves a gate, hook, monitor, or reaper actually fires by injecting a synthetic violation and watching it block from its own output, never by trusting a green check (green has two indistinguishable causes: nothing to catch, or catching nothing). | You are about to report a control "armed"/"protecting"/"done", or auditing one. |
 | [`design-fail-closed-gate`](skills/design-fail-closed-gate/SKILL.md) | Authors unattended and self-policed gates that fail CLOSED by construction: gate on a structured token not free-text prose, bind every green to a re-readable artifact, respect the harness's inverting exit-code semantics, and prove the gate denies before calling it armed. | You are authoring a PreToolUse/pre-commit/pre-push hook, secret scanner, CI merge gate, auto-reaper, or LLM self-review enforcer. |
+| [`author-workflow-fanout`](skills/author-workflow-fanout/SKILL.md) | Lints a Claude Code Workflow fan-out script before launch: flags an `agent()` call with no `.catch` (one rate-limited call rejects the whole run), a budget loop unguarded on `budget.total` (it runs to the 1000-agent cap), and a missing `meta` block; the prose covers the pipeline-vs-barrier and schema-vs-longform choices a linter cannot. | You are authoring or editing a Workflow scriptPath / multi-agent fan-out and want it to fail safe, not silently. |
 
 ### Worked examples (one per skill)
 
@@ -128,6 +129,11 @@ their frontmatter.
   command. This skill stops the silent fail-open trap (in Claude Code, an `exit 1` crash
   lets the tool run anyway), showing the exit-code semantics and the structured-token gate
   that make the safe verdict the structural default.
+- **`author-workflow-fanout`**: You are about to launch a 12-agent fan-out to review a
+  diff. You run `python3 workflow_lint.py review.js` first; it flags one `agent()` with no
+  `.catch` (a single rate-limited call would reject the whole `parallel()` at 90%) and a
+  `while (budget.remaining() ...)` loop with no `budget.total` guard (it would run to the
+  hard agent cap). You wrap the call in `.catch(() => null)`, guard the loop, then launch.
 
 ## Authoring conventions
 
