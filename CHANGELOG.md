@@ -6,7 +6,7 @@ an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
 
 ## [0.2.0] - 2026-07-04
 
-Catalog grown from 10 skills to 19.
+Catalog has grown from 10 skills to 19.
 
 ### Added
 
