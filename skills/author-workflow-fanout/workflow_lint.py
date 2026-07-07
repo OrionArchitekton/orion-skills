@@ -98,7 +98,7 @@ def logical_lines(blanked, raw):
 AGENT_RE = re.compile(r"(?<![\w.])agent\s*\(")
 # A wrapper definition forwards to agent(): `const wrap = (a, b) => agent(a, b)`
 # or `const wrap = (a, b) => { ...; return agent(a, b) }`. The DEF is not an
-# unguarded call — guarding (.catch) and schema live at the wrapper's CALL
+# unguarded call : guarding (.catch) and schema live at the wrapper's CALL
 # SITES (field case: a callAgent-style wrapper false-flagged).
 WRAPPER_DEF_RE = re.compile(
     r"(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>")
