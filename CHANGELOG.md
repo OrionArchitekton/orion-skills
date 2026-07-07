@@ -4,6 +4,22 @@ All notable changes to the orion-skills library. This project follows Semantic
 Versioning (https://semver.org): adding a skill is a MINOR bump, a non-breaking change to
 an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
 
+## [0.3.0] - 2026-07-06
+
+Catalog has grown from 19 skills to 21.
+
+### Added
+
+- **reprobe-stale-premise**: re-probe any claim you did not just verify before acting on it; a handoff premise, a teammate diagnosis, or a stale registry state is a hypothesis, not a fact.
+- **triage-fanout-verdicts**: read multi-agent fan-out verdicts honestly; an abstention or crashed lens is PENDING, never a verdict. Ships a deterministic triage helper.
+
+### Changed
+
+- **learn-capture**: optional confidence/scope calibration metadata on new notes.
+- **goal-prompt**: deterministic validation checklist for emitted conditions plus context-economy guidance for the fired run.
+- **author-workflow-fanout**: new unbounded-agent-hoard lint rule; the shipped linter gained wrapper-aware no-catch handling (safe and schema-bound wrappers recognized) and hardened numeric handling.
+- **scope-guard**: non-goals clarification (write scope, not concurrent-session racing).
+
 ## [0.2.0] - 2026-07-04
 
 Catalog has grown from 10 skills to 19.
