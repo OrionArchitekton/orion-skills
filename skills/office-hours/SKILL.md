@@ -239,6 +239,11 @@ source of truth for all closing state (tier, resource dedup, journey tracking).
 
 ```bash
 STATE_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours"
+# Protect the private state dir BEFORE the first write: git's local exclude file
+# ignores it immediately without mutating the tracked .gitignore. No-op outside git.
+GIT_DIR=$(git rev-parse --git-dir 2>/dev/null) && mkdir -p "$GIT_DIR/info" \
+  && grep -qxF '.office-hours/' "$GIT_DIR/info/exclude" 2>/dev/null \
+  || { [ -n "$GIT_DIR" ] && echo '.office-hours/' >> "$GIT_DIR/info/exclude"; }
 mkdir -p "$STATE_ROOT"
 ```
 
@@ -259,7 +264,18 @@ Append one JSON line with these fields (substitute actual values from this sessi
 
 ```bash
 STATE_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours"
-echo '{"date":"TIMESTAMP","mode":"MODE","project_slug":"SLUG","signal_count":N,"signals":SIGNALS_ARRAY,"design_doc":"DOC_PATH","assignment":"ASSIGNMENT_TEXT","resources_shown":[],"topics":TOPICS_ARRAY}' >> "$STATE_ROOT/builder-profile.jsonl"
+# Protect the private state dir BEFORE the first write: git's local exclude file
+# ignores it immediately without mutating the tracked .gitignore. No-op outside git.
+GIT_DIR=$(git rev-parse --git-dir 2>/dev/null) && mkdir -p "$GIT_DIR/info" \
+  && grep -qxF '.office-hours/' "$GIT_DIR/info/exclude" 2>/dev/null \
+  || { [ -n "$GIT_DIR" ] && echo '.office-hours/' >> "$GIT_DIR/info/exclude"; }
+jq -cn --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg mode "MODE" \
+  --arg slug "${SLUG:-unknown}" --argjson n N --argjson signals SIGNALS_ARRAY \
+  --arg doc "DOC_PATH" --arg assignment "ASSIGNMENT_TEXT" --argjson topics TOPICS_ARRAY \
+  '{date:$date,mode:$mode,project_slug:$slug,signal_count:$n,signals:$signals,design_doc:$doc,assignment:$assignment,resources_shown:[],topics:$topics}' \
+  >> "$STATE_ROOT/builder-profile.jsonl" 2>/dev/null || true
+# jq --arg guarantees valid JSON even when the assignment or topics contain
+# quotes/newlines; a raw interpolated echo corrupted the JSONL on such input.
 ```
 
 This entry is append-only. The `resources_shown` field will be updated via a second append
