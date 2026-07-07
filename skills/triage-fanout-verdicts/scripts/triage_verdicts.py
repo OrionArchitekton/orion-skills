@@ -41,21 +41,33 @@ def _first(d: dict, keys: tuple, default=None):
     return default
 
 
+def _int(v, field: str) -> int:
+    """Coerce a mechanism field to int; malformed input raises ValueError so
+    main() exits 2 (fail closed) instead of an uncaught TypeError traceback."""
+    if v is None:
+        return 0
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        raise ValueError(f"malformed numeric field {field!r}: {v!r}")
+
+
 def _votes(claim: dict) -> tuple[int, int]:
     votes = claim.get("votes")
     if isinstance(votes, dict):
-        return int(votes.get("refute", 0) or 0), int(votes.get("support", 0) or 0)
+        return (_int(votes.get("refute", 0) or 0, "votes.refute"),
+                _int(votes.get("support", 0) or 0, "votes.support"))
     return (
-        int(_first(claim, ("refute_votes", "refutingVotes"), 0) or 0),
-        int(_first(claim, ("support_votes", "supportingVotes"), 0) or 0),
+        _int(_first(claim, ("refute_votes", "refutingVotes"), 0) or 0, "refute_votes"),
+        _int(_first(claim, ("support_votes", "supportingVotes"), 0) or 0, "support_votes"),
     )
 
 
 def bucket_claim(claim: dict) -> str:
     """Bucket one claim from mechanism fields; the verdict label decides
     only the direction of an otherwise-substantiated verdict."""
-    reads = int(_first(claim, ("reads_completed", "completed_reads", "sources_read",
-                                "validVotes"), 0) or 0)
+    reads = _int(_first(claim, ("reads_completed", "completed_reads", "sources_read",
+                                 "validVotes"), 0) or 0, "reads_completed")
     errors = _first(claim, ("verifier_errors", "errors"), []) or []
     degraded = bool(_first(claim, ("degraded",), False))
     abstained = bool(_first(claim, ("could_not_verify", "abstained"), False))
@@ -76,7 +88,7 @@ def bucket_claim(claim: dict) -> str:
         # still met; otherwise it is pending, never a clean verdict.
         expected = _first(claim, ("expected_reads", "expected_votes", "quorum",
                                   "refutationsRequired"), None)
-        if expected is None or reads < int(expected or 0):
+        if expected is None or reads < _int(expected or 0, "expected_reads"):
             return "PENDING_INFRA"
     if verdict in ("confirmed", "supported", "survived", "verified") and support > 0:
         return "CONFIRMED"

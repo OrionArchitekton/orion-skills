@@ -121,6 +121,9 @@ def lint(text):
     # Pass 1: collect wrapper names (defs that forward to agent()) so their
     # call sites are linted like agent() calls and the defs themselves are not.
     stmts = list(logical_lines(blanked, text))
+    _re_schema = re.compile(r"\bschema\b")
+    schema_wrapper_names = set()  # wrapper def binds the schema itself: its
+                                  # call sites are NOT schema-less
     wrapper_names = set()       # forwarding wrappers: call sites must .catch
     safe_wrapper_names = set()  # wrapper body carries its own .catch: call
                                 # sites are inherently guarded (the documented
@@ -134,6 +137,8 @@ def lint(text):
                 or re.search(r"\breturn\s+agent\s*\(", bstmt)):
             (safe_wrapper_names if ".catch" in bstmt
              else wrapper_names).add(m.group(1))
+            if _re_schema.search(bstmt):
+                schema_wrapper_names.add(m.group(1))
             wrapper_def_lines.add(start)
     # Multi-line BLOCK wrappers: logical_lines splits on paren depth only, so
     # `const wrap = (a) => {\n  return agent(a)\n}` becomes separate statements
@@ -152,6 +157,8 @@ def lint(text):
         if re.search(r"\breturn\s+agent\s*\(", body):
             (safe_wrapper_names if ".catch" in body
              else wrapper_names).add(bm.group(1))
+            if _re_schema.search(body):
+                schema_wrapper_names.add(bm.group(1))
             first = blanked.count("\n", 0, bm.start()) + 1
             last = blanked.count("\n", 0, i) + 1
             wrapper_def_lines.update(range(first, last + 1))
@@ -160,9 +167,10 @@ def lint(text):
         for w in sorted(wrapper_names)]
     # safe wrappers still count for SCHEMA detection (a schema-less call via a
     # catching wrapper can still hoard longform bulk), just not for no-catch.
-    schema_call_res = call_res + [
+    schema_call_res = [AGENT_RE] + [
         re.compile(r"(?<![\w.])" + re.escape(w) + r"\s*\(")
-        for w in sorted(safe_wrapper_names)]
+        for w in sorted((wrapper_names | safe_wrapper_names)
+                        - schema_wrapper_names)]
 
     schemaless_agent = None  # (line, stmt) of a longform agent()/wrapper call
     accumulator = None       # (line, stmt) of an accumulation site
