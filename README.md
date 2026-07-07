@@ -58,6 +58,10 @@ their frontmatter.
 | [`author-workflow-fanout`](skills/author-workflow-fanout/SKILL.md) | Lints a Claude Code Workflow fan-out script before launch: flags an `agent()` call with no `.catch` (one rate-limited call rejects the whole run), a budget loop unguarded on `budget.total` (it runs to the 1000-agent cap), and a missing `meta` block; the prose covers the pipeline-vs-barrier and schema-vs-longform choices a linter cannot. | You are authoring or editing a Workflow scriptPath / multi-agent fan-out and want it to fail safe, not silently. |
 | [`reprobe-stale-premise`](skills/reprobe-stale-premise/SKILL.md) | Treats any inherited claim you did not just verify (a handoff's "still broken," a teammate's diagnosis, "tool X doesn't exist," a registry's "UNBUILT") as a hypothesis, not a fact, and re-probes live ground truth (fetched origin, real PR state, an actual reproduction) before you act on it. | You're about to fix, build, or rely on something based on a claim you inherited rather than just verified, especially on a shared multi-session box. |
 | [`triage-fanout-verdicts`](skills/triage-fanout-verdicts/SKILL.md) | Reads verify/judge fan-out output by its MECHANISM fields (votes cast, reads completed, verifier errors) instead of its verdict label, so a rate-limited "all refuted" or a dead "survived the skeptic" never coerces into a real verdict; ships a bundled bucketing script that exits 3 on any pending claim. | You're relaying or acting on a fan-out of verify/judge/skeptic verdicts, especially a unanimous one or one that saw rate limits or timeouts. |
+| [`investigate`](skills/investigate/SKILL.md) | Four-phase root-cause debugging discipline (investigate, analyze, hypothesize, implement), gated on a red-capable reproduction you've actually run before any hypothesis, and a regression test that fails before the fix and passes after. | You're asked to debug an error, fix a bug, or figure out why something that used to work just broke. |
+| [`document-release`](skills/document-release/SKILL.md) | Post-ship documentation pass: cross-references the diff against README/ARCHITECTURE/CONTRIBUTING/CLAUDE.md, polishes CHANGELOG voice without rewriting history, cleans up TODOS, and always asks before bumping VERSION. | After `/ship`, before the PR merges, when the docs need to catch up to what shipped. |
+| [`office-hours`](skills/office-hours/SKILL.md) | Product-ideation partner: startup mode pushes six forcing questions until "everyone wants this" becomes a named customer with real demand evidence; builder mode is an enthusiastic riff partner for side projects. Both modes end in a reviewed design doc and one concrete next action, never in code. | You have an idea you haven't validated yet, or you're asked "is this worth building". |
+| [`design-consultation`](skills/design-consultation/SKILL.md) | Proposes a complete, coherent design system (aesthetic, typography, color, layout, spacing, motion) as one package, not a menu, with an explicit safe-choices-vs-risks breakdown, then generates a working HTML preview page and writes DESIGN.md as the project's source of truth. | Starting a new project's UI with no DESIGN.md yet, or asked for "design system" / "brand guidelines". |
 
 ### Worked examples (one per skill)
 
@@ -144,6 +148,23 @@ their frontmatter.
   Reading the mechanism fields shows 10 of those had zero completed reads (one throttle
   window), not a real consensus. `python3 scripts/triage_verdicts.py verify.json` exits 3,
   flagging the decision PENDING instead of killing the build on a false refutation.
+- **`investigate`**: "The auth flow throws a 500, fix it." Before touching code, you build
+  one command that reproduces the 500 on demand, confirm three hypotheses in turn (the
+  first two don't match the evidence), then fix the third, root cause, and write a
+  regression test that fails without the fix and passes with it.
+- **`document-release`**: You just merged a PR that added a new CLI flag. `document-release`
+  reads the diff, adds the flag to README's usage table, flags the CHANGELOG entry for a
+  voice pass (never rewriting its content), and asks before bumping VERSION rather than
+  bumping it silently.
+- **`office-hours`**: "I have an idea for a tool that tracks X." Startup mode pushes past
+  "people would use this" to "Sarah, the ops manager at a 50-person logistics company,
+  would pay for this today," forces two distinct implementation approaches before any code
+  gets written, and closes the session with one concrete assignment and a design doc saved
+  to disk.
+- **`design-consultation`**: You're starting a new dashboard with no design system yet.
+  The skill proposes a full system in one pass, tells you which choices are safe category
+  defaults and which are deliberate risks, generates an HTML preview you can open in a
+  browser, and only then writes DESIGN.md.
 
 ## Authoring conventions
 

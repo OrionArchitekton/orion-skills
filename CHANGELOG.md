@@ -4,6 +4,17 @@ All notable changes to the orion-skills library. This project follows Semantic
 Versioning (https://semver.org): adding a skill is a MINOR bump, a non-breaking change to
 an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
 
+## [0.4.0] - 2026-07-06
+
+Catalog has grown from 21 skills to 25.
+
+### Added
+
+- **office-hours**: YC-style product ideation with six forcing questions, wedge and specificity pressure, and a builder brainstorm mode; saves a design doc.
+- **investigate**: systematic debugging in four phases with an Iron Law: no fixes without root cause.
+- **design-consultation**: a full design-system consultation (aesthetic, typography, color, layout, motion) that produces DESIGN.md as the project's design source of truth.
+- **document-release**: post-ship documentation sync; reads all project docs, cross-references the diff, and updates them to match what actually shipped.
+
 ## [0.3.0] - 2026-07-06
 
 Catalog has grown from 19 skills to 21.
