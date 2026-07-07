@@ -56,6 +56,8 @@ their frontmatter.
 | [`prove-control-binds`](skills/prove-control-binds/SKILL.md) | Proves a gate, hook, monitor, or reaper actually fires by injecting a synthetic violation and watching it block from its own output, never by trusting a green check (green has two indistinguishable causes: nothing to catch, or catching nothing). | You are about to report a control "armed"/"protecting"/"done", or auditing one. |
 | [`design-fail-closed-gate`](skills/design-fail-closed-gate/SKILL.md) | Authors unattended and self-policed gates that fail CLOSED by construction: gate on a structured token not free-text prose, bind every green to a re-readable artifact, respect the harness's inverting exit-code semantics, and prove the gate denies before calling it armed. | You are authoring a PreToolUse/pre-commit/pre-push hook, secret scanner, CI merge gate, auto-reaper, or LLM self-review enforcer. |
 | [`author-workflow-fanout`](skills/author-workflow-fanout/SKILL.md) | Lints a Claude Code Workflow fan-out script before launch: flags an `agent()` call with no `.catch` (one rate-limited call rejects the whole run), a budget loop unguarded on `budget.total` (it runs to the 1000-agent cap), and a missing `meta` block; the prose covers the pipeline-vs-barrier and schema-vs-longform choices a linter cannot. | You are authoring or editing a Workflow scriptPath / multi-agent fan-out and want it to fail safe, not silently. |
+| [`reprobe-stale-premise`](skills/reprobe-stale-premise/SKILL.md) | Treats any inherited claim you did not just verify (a handoff's "still broken," a teammate's diagnosis, "tool X doesn't exist," a registry's "UNBUILT") as a hypothesis, not a fact, and re-probes live ground truth (fetched origin, real PR state, an actual reproduction) before you act on it. | You're about to fix, build, or rely on something based on a claim you inherited rather than just verified, especially on a shared multi-session box. |
+| [`triage-fanout-verdicts`](skills/triage-fanout-verdicts/SKILL.md) | Reads verify/judge fan-out output by its MECHANISM fields (votes cast, reads completed, verifier errors) instead of its verdict label, so a rate-limited "all refuted" or a dead "survived the skeptic" never coerces into a real verdict; ships a bundled bucketing script that exits 3 on any pending claim. | You're relaying or acting on a fan-out of verify/judge/skeptic verdicts, especially a unanimous one or one that saw rate limits or timeouts. |
 
 ### Worked examples (one per skill)
 
@@ -134,6 +136,14 @@ their frontmatter.
   `.catch` (a single rate-limited call would reject the whole `parallel()` at 90%) and a
   `while (budget.remaining() ...)` loop with no `budget.total` guard (it would run to the
   hard agent cap). You wrap the call in `.catch(() => null)`, guard the loop, then launch.
+- **`reprobe-stale-premise`**: A resumed handoff says "the auth bug is still broken."
+  Before touching code, you `git fetch origin` and re-run the failing case: it already
+  reproduces clean, someone fixed it hours ago. You report `ALREADY-FIXED` instead of
+  re-patching a solved problem.
+- **`triage-fanout-verdicts`**: A 12-agent verify fan-out comes back "10 of 12 refuted."
+  Reading the mechanism fields shows 10 of those had zero completed reads (one throttle
+  window), not a real consensus. `python3 scripts/triage_verdicts.py verify.json` exits 3,
+  flagging the decision PENDING instead of killing the build on a false refutation.
 
 ## Authoring conventions
 
