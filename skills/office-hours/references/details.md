@@ -302,14 +302,17 @@ Generate a single-page HTML file with these constraints:
 
 Write to a temp file:
 ```bash
-SKETCH_FILE="/tmp/office-hours-sketch-$(date +%s).html"
+SKETCH_FILE=$(mktemp /tmp/office-hours-sketch-XXXXXXXX.html)
 ```
 
 **Step 3: Render and capture**
 
 If you have a browser automation tool available in this environment (a Playwright/Puppeteer
 MCP server, a headless-browser CLI, etc.), use it to open `$SKETCH_FILE` and capture a
-screenshot to `/tmp/office-hours-sketch.png`.
+screenshot to a fresh temp path:
+```bash
+SKETCH_PNG=$(mktemp /tmp/office-hours-sketch-XXXXXXXX.png)
+```
 
 If no such tool is available, skip the render step. Tell the
 user: "Visual sketch requires a browser automation tool, none is configured here. Open the sketch
@@ -325,8 +328,8 @@ If they approve or say "good enough," proceed.
 **Step 5: Include in design doc**
 
 Reference the wireframe screenshot in the design doc's "Recommended Approach" section.
-The screenshot file at `/tmp/office-hours-sketch.png` can be referenced by any downstream
-planning or design-review work to see what was originally envisioned.
+The screenshot file at `$SKETCH_PNG` (the exact path generated in Step 3) can be referenced
+by any downstream planning or design-review work to see what was originally envisioned.
 
 **Step 6: Outside design voices** (optional)
 
@@ -369,11 +372,12 @@ over time.
 ### Step 1: Read Builder Profile
 
 ```bash
-PROFILE_FILE="$HOME/.claude/state/office-hours/builder-profile.jsonl"
+PROFILE_FILE="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours/builder-profile.jsonl"
 SESSION_COUNT=0
-if [ -f "$PROFILE_FILE" ]; then
-  SESSION_COUNT=$(jq -s --arg slug "${SLUG:-unknown}" '[.[] | select(.project_slug == $slug and (.mode == "startup" or .mode == "builder"))] | length' "$PROFILE_FILE" 2>/dev/null || echo 0)
+if [ -f "$PROFILE_FILE" ] && command -v jq >/dev/null 2>&1; then
+  SESSION_COUNT=$(jq -s --arg slug "${SLUG:-unknown}" '[.[] | select(.project_slug == $slug and (.mode == "startup" or .mode == "builder"))] | length' "$PROFILE_FILE" 2>/dev/null)
 fi
+SESSION_COUNT=${SESSION_COUNT:-0}
 if [ "$SESSION_COUNT" -le 1 ] 2>/dev/null; then SESSION_TIER="introduction"
 elif [ "$SESSION_COUNT" -le 3 ] 2>/dev/null; then SESSION_TIER="welcome_back"
 elif [ "$SESSION_COUNT" -le 7 ] 2>/dev/null; then SESSION_TIER="regular"
@@ -504,11 +508,11 @@ Design trajectory with interpretation:
 "You started this as a side project. But you've named specific users, pushed back when challenged, and your designs keep getting sharper each time. I don't think this is a side project anymore. Have you thought about whether this could be a company?"
 This must feel earned, not broadcast. If the evidence doesn't support it, skip entirely.
 
-**Builder Journey Summary** (session 5+): Auto-generate `~/.claude/state/office-hours/builder-journey.md`
+**Builder Journey Summary** (session 5+): Auto-generate `.office-hours/builder-journey.md`
 with a narrative arc (not a data table). The arc tells the STORY of their journey in
 second person, referencing specific things they said across sessions. Then open it:
 ```bash
-STATE_ROOT="$HOME/.claude/state/office-hours"
+STATE_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours"
 mkdir -p "$STATE_ROOT"
 open "$STATE_ROOT/builder-journey.md"
 ```
@@ -525,7 +529,7 @@ The data speaks. No pitch needed.
 
 Full accumulated signal summary from the profile.
 
-Auto-generate updated `~/.claude/state/office-hours/builder-journey.md` with narrative arc. Open it.
+Auto-generate updated `.office-hours/builder-journey.md` with narrative arc. Open it.
 
 Then proceed to Founder Resources below.
 
@@ -612,15 +616,16 @@ PAUL GRAHAM ESSAYS:
 1. Log the selected resource URLs to the builder profile (single source of truth).
 Append a resource-tracking entry:
 ```bash
-STATE_ROOT="$HOME/.claude/state/office-hours"
+STATE_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours"
 mkdir -p "$STATE_ROOT"
 echo '{"date":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'","mode":"resources","project_slug":"'"${SLUG:-unknown}"'","signal_count":0,"signals":[],"design_doc":"","assignment":"","resources_shown":["URL1","URL2","URL3"],"topics":[]}' >> "$STATE_ROOT/builder-profile.jsonl"
 ```
 
 2. Log the selection to analytics:
 ```bash
-mkdir -p ~/.claude/state/office-hours/analytics
-echo '{"skill":"office-hours","event":"resources_shown","count":NUM_RESOURCES,"categories":"CAT1,CAT2","ts":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}' >> ~/.claude/state/office-hours/analytics/skill-usage.jsonl 2>/dev/null || true
+ANALYTICS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours/analytics"
+mkdir -p "$ANALYTICS_DIR"
+echo '{"skill":"office-hours","event":"resources_shown","count":NUM_RESOURCES,"categories":"CAT1,CAT2","ts":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}' >> "$ANALYTICS_DIR/skill-usage.jsonl" 2>/dev/null || true
 ```
 
 3. Use AskUserQuestion to offer opening the resources:
@@ -651,7 +656,7 @@ After the closing, suggest a next step appropriate to what was designed:
 If your own toolset has dedicated planning or design-review skills, name them here instead
 of this generic guidance.
 
-The design doc at `~/.claude/state/office-hours/projects/` is automatically discoverable by
+The design doc at `docs/design/` is automatically discoverable by
 any downstream work that reads the project directory before starting.
 
 ---

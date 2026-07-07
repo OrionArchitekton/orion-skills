@@ -21,9 +21,12 @@ BRANCH=${BRANCH//\//-}
 4. **List existing design docs for this project:**
    ```bash
    setopt +o nomatch 2>/dev/null || true  # zsh compat
-   mkdir -p ~/.claude/state/office-hours/projects/$SLUG
-   ls -t ~/.claude/state/office-hours/projects/$SLUG/*-design-*.md 2>/dev/null
+   PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+   mkdir -p "$PROJECT_ROOT/docs/design"
+   ls -t "$PROJECT_ROOT"/docs/design/*-design-*.md 2>/dev/null
    ```
+   Design docs are deliverable artifacts: they live under `docs/design/` in the project
+   (not a Claude-local home) so they can be committed like any other doc.
    If design docs exist, list them: "Prior designs for this project: [titles + dates]"
 5. **Ask: what's your goal with this?** This is a real question, not a formality. The answer determines everything about how the session runs.
 
@@ -102,14 +105,15 @@ After the user states the problem (first question in Phase 2A or 2B), search exi
 Extract 3-5 significant keywords from the user's problem statement and grep across design docs:
 ```bash
 setopt +o nomatch 2>/dev/null || true  # zsh compat
-grep -li "<keyword1>\|<keyword2>\|<keyword3>" ~/.claude/state/office-hours/projects/$SLUG/*-design-*.md 2>/dev/null
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+grep -li "<keyword1>\|<keyword2>\|<keyword3>" "$PROJECT_ROOT"/docs/design/*-design-*.md 2>/dev/null
 ```
 
 If matches found, read the matching design docs and surface them:
 - "FYI: Related design found: '{title}' by {user} on {date} (branch: {branch}). Key overlap: {1-line summary of relevant section}."
 - Ask via AskUserQuestion: "Should we build on this prior design or start fresh?"
 
-This surfaces prior sessions on the same project; earlier design docs for this repo will show up automatically from `~/.claude/state/office-hours/projects/`.
+This surfaces prior sessions on the same project; earlier design docs for this repo will show up automatically from `docs/design/`.
 
 If no matches found, proceed silently.
 
@@ -234,9 +238,13 @@ After counting signals, append a session entry to the builder profile. This is t
 source of truth for all closing state (tier, resource dedup, journey tracking).
 
 ```bash
-STATE_ROOT="$HOME/.claude/state/office-hours"
+STATE_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours"
 mkdir -p "$STATE_ROOT"
 ```
+
+This is project-local state (not a Claude-local home), so on first use in a project,
+suggest to the user: add `.office-hours/` to the project's `.gitignore` (it holds
+personal session state, not a deliverable).
 
 Append one JSON line with these fields (substitute actual values from this session):
 - `date`: current ISO 8601 timestamp
@@ -250,7 +258,7 @@ Append one JSON line with these fields (substitute actual values from this sessi
 - `topics`: array of 2-3 topic keywords that describe what this session was about
 
 ```bash
-STATE_ROOT="$HOME/.claude/state/office-hours"
+STATE_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours"
 echo '{"date":"TIMESTAMP","mode":"MODE","project_slug":"SLUG","signal_count":N,"signals":SIGNALS_ARRAY,"design_doc":"DOC_PATH","assignment":"ASSIGNMENT_TEXT","resources_shown":[],"topics":TOPICS_ARRAY}' >> "$STATE_ROOT/builder-profile.jsonl"
 ```
 
@@ -265,7 +273,8 @@ Write the design document to the project directory.
 
 ```bash
 SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-')
-mkdir -p ~/.claude/state/office-hours/projects/$SLUG
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+mkdir -p "$PROJECT_ROOT/docs/design"
 USER=$(whoami)
 DATETIME=$(date +%Y%m%d-%H%M%S)
 BRANCH=$(git branch --show-current 2>/dev/null || echo main)
@@ -277,14 +286,15 @@ BRANCH=${BRANCH//\//-}
 ```bash
 setopt +o nomatch 2>/dev/null || true  # zsh compat
 if [ -n "$BRANCH" ]; then
-  PRIOR=$(ls -t ~/.claude/state/office-hours/projects/$SLUG/*-$BRANCH-design-*.md 2>/dev/null | head -1)
+  PRIOR=$(ls -t "$PROJECT_ROOT"/docs/design/*-$BRANCH-design-*.md 2>/dev/null | head -1)
 else
   PRIOR=""
 fi
 ```
 If `$PRIOR` exists, the new doc gets a `Supersedes:` field referencing it. This creates a revision chain: you can trace how a design evolved across office hours sessions.
 
-Write to `~/.claude/state/office-hours/projects/{slug}/{user}-{branch}-design-{datetime}.md`.
+Write to `docs/design/{user}-{branch}-design-{datetime}.md` (project root). This is a
+deliverable artifact, not Claude-local state: commit it like any other doc.
 
 After writing the design doc, tell the user:
 **"Design doc saved to: {full path}. Use it as the seed for a build prompt (`/goal-prompt`), or a future office-hours session will link it automatically via the `Supersedes:` chain."**
@@ -464,8 +474,9 @@ After the loop completes (PASS, max iterations, or convergence guard):
 
 3. Append metrics:
 ```bash
-mkdir -p ~/.claude/state/office-hours/analytics
-echo '{"skill":"office-hours","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","iterations":ITERATIONS,"issues_found":FOUND,"issues_fixed":FIXED,"remaining":REMAINING,"quality_score":SCORE}' >> ~/.claude/state/office-hours/analytics/spec-review.jsonl 2>/dev/null || true
+ANALYTICS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours/analytics"
+mkdir -p "$ANALYTICS_DIR"
+echo '{"skill":"office-hours","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","iterations":ITERATIONS,"issues_found":FOUND,"issues_fixed":FIXED,"remaining":REMAINING,"quality_score":SCORE}' >> "$ANALYTICS_DIR/spec-review.jsonl" 2>/dev/null || true
 ```
 Replace ITERATIONS, FOUND, FIXED, REMAINING, SCORE with actual values from the review.
 

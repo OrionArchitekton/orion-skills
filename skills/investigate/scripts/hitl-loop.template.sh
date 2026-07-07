@@ -21,10 +21,12 @@ step() {
 }
 
 capture() {
-  local var="$1" question="$2" answer
-  printf '\n>>> %s\n' "$question"
-  read -r -p "    > " answer
-  printf -v "$var" '%s' "$answer"
+  # underscore-prefixed locals: bash locals are dynamically scoped, so a caller
+  # passing the name "var"/"answer" would otherwise collide and lose the value
+  local _var="$1" _question="$2" _answer
+  printf '\n>>> %s\n' "$_question"
+  read -r -p "    > " _answer
+  printf -v "$_var" '%s' "$_answer"
 }
 
 # --- edit below ---------------------------------------------------------

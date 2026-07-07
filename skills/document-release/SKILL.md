@@ -321,12 +321,14 @@ git push
 
 **If GitHub:**
 ```bash
-gh pr view --json body -q .body > /tmp/docrel-pr-body-$$.md
+BODY_FILE=$(mktemp /tmp/docrel-pr-body-XXXXXXXX.md)
+gh pr view --json body -q .body > "$BODY_FILE"
 ```
 
 **If GitLab:**
 ```bash
-glab mr view -F json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('description',''))" > /tmp/docrel-pr-body-$$.md
+BODY_FILE=$(mktemp /tmp/docrel-pr-body-XXXXXXXX.md)
+glab mr view -F json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('description',''))" > "$BODY_FILE"
 ```
 
 2. If the tempfile already contains a `## Documentation` section, replace that section with the
@@ -340,22 +342,19 @@ glab mr view -F json 2>/dev/null | python3 -c "import sys,json; print(json.load(
 
 **If GitHub:**
 ```bash
-gh pr edit --body-file /tmp/docrel-pr-body-$$.md
+gh pr edit --body-file "$BODY_FILE"
 ```
 
 **If GitLab:**
-Read the contents of `/tmp/docrel-pr-body-$$.md` using the Read tool, then pass it to `glab mr update` using a heredoc to avoid shell metacharacter issues:
+Pass the edited body file directly (command substitution inside double quotes is not word-split, so no manual pasting is needed):
 ```bash
-glab mr update -d "$(cat <<'MRBODY'
-<paste the file contents here>
-MRBODY
-)"
+glab mr update -d "$(cat "$BODY_FILE")"
 ```
 
 5. Clean up the tempfile:
 
 ```bash
-rm -f /tmp/docrel-pr-body-$$.md
+rm -f "$BODY_FILE"
 ```
 
 6. If `gh pr view` / `glab mr view` fails (no PR/MR exists): skip with message "No PR/MR found, skipping body update."

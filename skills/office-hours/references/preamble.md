@@ -5,8 +5,8 @@ _Load the sections below when a phase in SKILL.md or details.md points you here.
 ## Plan Mode Safe Operations
 
 In plan mode, allowed because they inform the plan: a browser automation tool if one is
-configured, `codex exec`/`codex review`, writes to `~/.claude/state/office-hours/`, writes
-to the plan file, and `open` for generated artifacts.
+configured, `codex exec`/`codex review`, writes to `docs/design/` and `.office-hours/`
+(project-local), writes to the plan file, and `open` for generated artifacts.
 
 ## Skill Invocation During Plan Mode
 
@@ -165,8 +165,9 @@ Before building anything unfamiliar, **search first.**
 
 **Eureka:** When first-principles reasoning contradicts conventional wisdom, name it and log:
 ```bash
-mkdir -p ~/.claude/state/office-hours/analytics
-jq -n --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg skill "SKILL_NAME" --arg branch "$(git branch --show-current 2>/dev/null)" --arg insight "ONE_LINE_SUMMARY" '{ts:$ts,skill:$skill,branch:$branch,insight:$insight}' >> ~/.claude/state/office-hours/analytics/eureka.jsonl 2>/dev/null || true
+ANALYTICS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours/analytics"
+mkdir -p "$ANALYTICS_DIR"
+jq -n --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg skill "SKILL_NAME" --arg branch "$(git branch --show-current 2>/dev/null)" --arg insight "ONE_LINE_SUMMARY" '{ts:$ts,skill:$skill,branch:$branch,insight:$insight}' >> "$ANALYTICS_DIR/eureka.jsonl" 2>/dev/null || true
 ```
 
 ## Completion Status Protocol
