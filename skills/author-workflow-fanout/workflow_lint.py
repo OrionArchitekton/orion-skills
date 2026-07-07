@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Heuristic smell-detector for Claude Code Workflow (scriptPath) fan-out scripts.
+"""Heuristic smell-detector for estate Workflow (scriptPath) fan-out scripts.
 
 Not a full JS parser -- a deterministic linter for the three highest-cost,
 most-recurring Workflow authoring bugs, each mapped to a durable lesson:
@@ -8,6 +8,7 @@ most-recurring Workflow authoring bugs, each mapped to a durable lesson:
                   wrapper that does) so one dead search / rate-limit does not
                   crash the whole fan-out; the failure must become a ledger
                   entry + abstention, not an unhandled reject.
+                  (drift-test + catch lesson)
   budget-unguarded a while-loop reading budget.remaining()/spent() without
                   budget.total in the SAME condition runs to the 1000-agent
                   cap when no token target is set (remaining() is Infinity).
@@ -97,8 +98,8 @@ def logical_lines(blanked, raw):
 AGENT_RE = re.compile(r"(?<![\w.])agent\s*\(")
 # A wrapper definition forwards to agent(): `const wrap = (a, b) => agent(a, b)`
 # or `const wrap = (a, b) => { ...; return agent(a, b) }`. The DEF is not an
-# unguarded call: guarding (.catch) and schema live at the wrapper's CALL
-# SITES (a real fan-out script's own wrapper was previously false-flagged here).
+# unguarded call — guarding (.catch) and schema live at the wrapper's CALL
+# SITES (field case: a callAgent-style wrapper false-flagged).
 WRAPPER_DEF_RE = re.compile(
     r"(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>")
 WHILE_RE = re.compile(r"\bwhile\s*\(")
@@ -130,6 +131,25 @@ def lint(text):
                 or re.search(r"\breturn\s+agent\s*\(", bstmt)):
             wrapper_names.add(m.group(1))
             wrapper_def_lines.add(start)
+    # Multi-line BLOCK wrappers: logical_lines splits on paren depth only, so
+    # `const wrap = (a) => {\n  return agent(a)\n}` becomes separate statements
+    # and the inner return line would false-flag as an unguarded call. Collect
+    # brace-matched wrapper blocks over the blanked text and exempt every line
+    # inside one (review finding, PR-level; regression-tested).
+    for bm in re.finditer(
+            r"(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>\s*\{",
+            blanked):
+        depth, i = 1, bm.end()
+        while i < len(blanked) and depth:
+            if blanked[i] == "{": depth += 1
+            elif blanked[i] == "}": depth -= 1
+            i += 1
+        body = blanked[bm.end():i]
+        if re.search(r"\breturn\s+agent\s*\(", body):
+            wrapper_names.add(bm.group(1))
+            first = blanked.count("\n", 0, bm.start()) + 1
+            last = blanked.count("\n", 0, i) + 1
+            wrapper_def_lines.update(range(first, last + 1))
     call_res = [AGENT_RE] + [
         re.compile(r"(?<![\w.])" + re.escape(w) + r"\s*\(")
         for w in sorted(wrapper_names)]
@@ -144,7 +164,7 @@ def lint(text):
         if is_call and ".catch" not in bstmt:
             findings.append({"rule": "no-catch", "line": start,
                              "snippet": stmt.strip()[:120]})
-        if is_call and "schema" not in bstmt and schemaless_agent is None:
+        if is_call and not re.search(r"\bschema\b", bstmt) and schemaless_agent is None:
             schemaless_agent = (start, stmt)
         if ACCUM_RE.search(bstmt) and accumulator is None:
             accumulator = (start, stmt)

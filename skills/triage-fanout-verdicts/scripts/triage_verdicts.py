@@ -13,7 +13,6 @@ A rate-limited refuter that defaulted to "refuted" (or a dead skeptic
 that read as "survived") lands in PENDING_INFRA, never in a real bucket.
 Aggregator summary fields are ignored by design: they are the
 aggregator's claim, and the whole point is to recompute from per-claim
-data.
 
 Exit codes:
     0  no pending claims (every verdict is backed by completed reads)
@@ -26,7 +25,7 @@ reads_completed/completed_reads/sources_read, verifier_errors/errors,
 could_not_verify/abstained, votes.{refute,support} or flat
 refute_votes/support_votes).
 
-Companion of the triage-fanout-verdicts skill.
+Companion of the triage-fanout-verdicts skill; selftested by
 """
 
 from __future__ import annotations
@@ -47,19 +46,21 @@ def _votes(claim: dict) -> tuple[int, int]:
     if isinstance(votes, dict):
         return int(votes.get("refute", 0) or 0), int(votes.get("support", 0) or 0)
     return (
-        int(_first(claim, ("refute_votes",), 0) or 0),
-        int(_first(claim, ("support_votes",), 0) or 0),
+        int(_first(claim, ("refute_votes", "refutingVotes"), 0) or 0),
+        int(_first(claim, ("support_votes", "supportingVotes"), 0) or 0),
     )
 
 
 def bucket_claim(claim: dict) -> str:
     """Bucket one claim from mechanism fields; the verdict label decides
     only the direction of an otherwise-substantiated verdict."""
-    reads = int(_first(claim, ("reads_completed", "completed_reads", "sources_read"), 0) or 0)
+    reads = int(_first(claim, ("reads_completed", "completed_reads", "sources_read",
+                                "validVotes"), 0) or 0)
     errors = _first(claim, ("verifier_errors", "errors"), []) or []
+    degraded = bool(_first(claim, ("degraded",), False))
     abstained = bool(_first(claim, ("could_not_verify", "abstained"), False))
     refute, support = _votes(claim)
-    verdict = str(_first(claim, ("verdict", "result", "outcome"), "")).lower()
+    verdict = str(_first(claim, ("verdict", "result", "outcome", "status"), "")).lower()
 
     if abstained:
         return "PENDING_ABSTAIN"
@@ -68,6 +69,15 @@ def bucket_claim(claim: dict) -> str:
         # cause explicit, but absence of evidence alone is already
         # disqualifying: a verdict with no reads is a default, not a verdict.
         return "PENDING_INFRA"
+    if errors or degraded:
+        # Evidence coexisting with verifier errors means the verdict formed on
+        # PARTIAL completion (the 429/timeout class this tool exists to block).
+        # It stands only when the record itself proves the expected quorum was
+        # still met; otherwise it is pending, never a clean verdict.
+        expected = _first(claim, ("expected_reads", "expected_votes", "quorum",
+                                  "refutationsRequired"), None)
+        if expected is None or reads < int(expected or 0):
+            return "PENDING_INFRA"
     if verdict in ("confirmed", "supported", "survived", "verified") and support > 0:
         return "CONFIRMED"
     if verdict in ("refuted", "rejected", "failed") and refute > 0:
@@ -77,10 +87,16 @@ def bucket_claim(claim: dict) -> str:
     return "PENDING_INFRA" if errors else "PENDING_ABSTAIN"
 
 
-def triage(data: dict) -> dict:
-    claims = _first(data, ("claims", "verdicts", "results"), [])
+def triage(data) -> dict:
+    # A verify phase may emit the per-claim records as a TOP-LEVEL list or
+    # wrapped under claims/verdicts/results; accept both documented shapes.
+    if isinstance(data, list):
+        claims = data
+    else:
+        claims = _first(data, ("claims", "verdicts", "results"), [])
     if not isinstance(claims, list) or not claims:
-        raise ValueError("no claims list found (looked for claims/verdicts/results)")
+        raise ValueError(
+            "no claims list found (top-level list or claims/verdicts/results)")
     buckets: dict[str, list[str]] = {
         "CONFIRMED": [], "REFUTED": [], "PENDING_INFRA": [], "PENDING_ABSTAIN": [],
     }
