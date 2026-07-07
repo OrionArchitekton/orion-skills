@@ -121,7 +121,10 @@ def lint(text):
     # Pass 1: collect wrapper names (defs that forward to agent()) so their
     # call sites are linted like agent() calls and the defs themselves are not.
     stmts = list(logical_lines(blanked, text))
-    wrapper_names = set()
+    wrapper_names = set()       # forwarding wrappers: call sites must .catch
+    safe_wrapper_names = set()  # wrapper body carries its own .catch: call
+                                # sites are inherently guarded (the documented
+                                # "or a wrapper that does" contract)
     wrapper_def_lines = set()
     for start, stmt in stmts:
         bstmt = blank_literals_and_comments(stmt)
@@ -129,7 +132,8 @@ def lint(text):
         if m and AGENT_RE.search(bstmt) and (
                 re.search(r"=>\s*agent\s*\(", bstmt)
                 or re.search(r"\breturn\s+agent\s*\(", bstmt)):
-            wrapper_names.add(m.group(1))
+            (safe_wrapper_names if ".catch" in bstmt
+             else wrapper_names).add(m.group(1))
             wrapper_def_lines.add(start)
     # Multi-line BLOCK wrappers: logical_lines splits on paren depth only, so
     # `const wrap = (a) => {\n  return agent(a)\n}` becomes separate statements
@@ -146,13 +150,19 @@ def lint(text):
             i += 1
         body = blanked[bm.end():i]
         if re.search(r"\breturn\s+agent\s*\(", body):
-            wrapper_names.add(bm.group(1))
+            (safe_wrapper_names if ".catch" in body
+             else wrapper_names).add(bm.group(1))
             first = blanked.count("\n", 0, bm.start()) + 1
             last = blanked.count("\n", 0, i) + 1
             wrapper_def_lines.update(range(first, last + 1))
     call_res = [AGENT_RE] + [
         re.compile(r"(?<![\w.])" + re.escape(w) + r"\s*\(")
         for w in sorted(wrapper_names)]
+    # safe wrappers still count for SCHEMA detection (a schema-less call via a
+    # catching wrapper can still hoard longform bulk), just not for no-catch.
+    schema_call_res = call_res + [
+        re.compile(r"(?<![\w.])" + re.escape(w) + r"\s*\(")
+        for w in sorted(safe_wrapper_names)]
 
     schemaless_agent = None  # (line, stmt) of a longform agent()/wrapper call
     accumulator = None       # (line, stmt) of an accumulation site
@@ -161,10 +171,12 @@ def lint(text):
         is_wrapper_def = start in wrapper_def_lines
         is_call = (not is_wrapper_def) and any(
             r.search(bstmt) for r in call_res)
+        is_schema_call = (not is_wrapper_def) and any(
+            r.search(bstmt) for r in schema_call_res)
         if is_call and ".catch" not in bstmt:
             findings.append({"rule": "no-catch", "line": start,
                              "snippet": stmt.strip()[:120]})
-        if is_call and not re.search(r"\bschema\b", bstmt) and schemaless_agent is None:
+        if is_schema_call and not re.search(r"\bschema\b", bstmt) and schemaless_agent is None:
             schemaless_agent = (start, stmt)
         if ACCUM_RE.search(bstmt) and accumulator is None:
             accumulator = (start, stmt)
