@@ -98,7 +98,7 @@ git diff <base>...HEAD --name-only
 3. Discover all documentation files in the repo:
 
 ```bash
-find . -maxdepth 2 -name "*.md" -not -path "./.git/*" -not -path "./node_modules/*" -not -path "./.context/*" | sort
+find . -maxdepth 4 -name "*.md" -not -path "./.git/*" -not -path "./node_modules/*" -not -path "./.context/*" | sort
 ```
 
 4. Classify the changes into categories relevant to documentation:
@@ -362,9 +362,29 @@ rm -f /tmp/docrel-pr-body-$$.md
 7. If `gh pr edit` / `glab mr update` fails: warn "Could not update PR/MR body; documentation changes are in the
    commit." and continue.
 
-**PR/MR title sync (idempotent, always-on):**
+**PR/MR title sync (idempotent, convention-gated):**
 
-PR titles must always start with `v<VERSION>`. If Step 8 bumped VERSION after `/ship` had already created the PR, the title is now stale. This sub-step fixes it.
+PR titles must always start with `v<VERSION>` in repos that already use this convention. If Step 8 bumped VERSION after `/ship` had already created the PR, the title may be stale in those repos, this sub-step fixes it there, and skips everywhere else.
+
+**Convention check (gates this entire sub-step):**
+
+```bash
+DOC_HIT=$(grep -rliE 'pr (title|titles).{0,60}v.?version|title.{0,30}(must|should) start with.{0,10}v' CONTRIBUTING.md docs/*.md README.md 2>/dev/null | head -1)
+```
+
+**If GitHub:**
+```bash
+RECENT_TITLES=$(gh pr list --state merged --limit 5 --json title -q '.[].title' 2>/dev/null)
+```
+
+**If GitLab:**
+```bash
+RECENT_TITLES=$(glab mr list --state merged --per-page 5 2>/dev/null)
+```
+
+The convention is confirmed if `DOC_HIT` is non-empty, or at least 3 of the lines in `RECENT_TITLES` match `^v[0-9]`. **If not confirmed:** skip this entire sub-step and note in the final summary: "PR/MR title sync skipped, repo does not demonstrably use the v<VERSION> title convention." Do not touch the title.
+
+**If confirmed, proceed:**
 
 1. Read the current VERSION:
 

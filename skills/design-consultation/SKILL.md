@@ -169,6 +169,8 @@ Present subagent output under a `CLAUDE SUBAGENT (design direction):` header.
 - Genuine divergences as creative alternatives for the user to choose from
 - "Codex and I agree on X. Codex suggested Y where I'm proposing Z, here's why..."
 
+**Before continuing:** Load `references/details.md` and execute Phase 3 (The Complete Proposal) from it, incorporating any outside-voices synthesis above.
+
 ## Phase 4: Drill-downs (only if user requests adjustments)
 
 When the user wants to change a specific section, go deep on that section:
@@ -191,11 +193,13 @@ When a direction is genuinely uncertain and discussion isn't resolving it, build
 
 Pick the branch from the question (a page/component leads to UI variants; a backend/state model leads to a terminal app). Delete the prototype once it has answered the question.
 
+**Before continuing:** Unless the user skipped previews, load `references/details.md` and execute Phase 5 (Design System Preview) from it before continuing to Phase 6.
+
 ## Phase 6: Write DESIGN.md & Confirm
 
 **If in plan mode:** Write the DESIGN.md content into the plan file as a "## Proposed DESIGN.md" section. Do NOT write the actual file, that happens at implementation time.
 
-**If NOT in plan mode:** Write `DESIGN.md` to the repo root with this structure:
+**If NOT in plan mode:** Assemble the full `DESIGN.md` content below, do NOT write it to disk yet:
 
 ```markdown
 # Design System, [Project Name]
@@ -251,7 +255,7 @@ Pick the branch from the question (a page/component leads to UI variants; a back
 | [today] | Initial design system created | Created by /design-consultation based on [product context / research] |
 ```
 
-**Update CLAUDE.md** (or create it if it doesn't exist), append this section:
+Also assemble the `CLAUDE.md` addition below, do NOT write it yet:
 
 ```markdown
 ## Design System
@@ -263,10 +267,14 @@ In QA mode, flag any code that doesn't match DESIGN.md.
 
 **AskUserQuestion Q-final, show summary and confirm:**
 
-List all decisions. Flag any that used agent defaults without explicit user confirmation (the user should know what they're shipping). Options:
+List all decisions. Flag any that used agent defaults without explicit user confirmation (the user should know what they're shipping). Present the full assembled `DESIGN.md` content (and the `CLAUDE.md` addition) above for review before writing anything. Options:
 - A) Ship it: write DESIGN.md and CLAUDE.md
 - B) I want to change something (specify what)
 - C) Start over
+
+**On A (Ship it):** Write `DESIGN.md` to the repo root with the content assembled above. Then update `CLAUDE.md` (or create it if it doesn't exist) by appending the section assembled above. Nothing is written to the repo before this point.
+
+**On B or C:** Do not write DESIGN.md or CLAUDE.md, the repo stays untouched. For B, loop back to revise the specified sections and re-assemble before asking again. For C, return to Phase 1.
 
 After shipping DESIGN.md, if the session produced screen-level mockups or page layouts
 (not just system-level tokens), suggest generating a working HTML preview of the key

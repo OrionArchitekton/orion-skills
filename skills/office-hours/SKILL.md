@@ -10,6 +10,9 @@ Understand the project and the area the user wants to change.
 
 ```bash
 SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-')
+BRANCH=$(git branch --show-current 2>/dev/null || echo main)
+BRANCH=${BRANCH:-main}
+BRANCH=${BRANCH//\//-}
 ```
 
 1. Read `CLAUDE.md`, `TODOS.md` (if they exist).
@@ -36,7 +39,7 @@ SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" | tr '[:up
    > - **Having fun**: side project, creative outlet, just vibing
 
    **Mode mapping:**
-   - Startup, intrapreneurship: **Startup mode** (Phase 2A)
+   - Startup, intrapreneurship: **Startup mode** (Phase 2A). Load `references/details.md` and execute Phase 2A from it before continuing.
    - Hackathon, open source, research, learning, having fun: **Builder mode** (Phase 2B)
 
 6. **Assess product stage** (only for startup/intrapreneurship modes):
@@ -88,7 +91,7 @@ Ask these **ONE AT A TIME** via AskUserQuestion. The goal is to brainstorm and s
 
 **Escape hatch:** If the user says "just do it," expresses impatience, or provides a fully formed plan, fast-track to Phase 4 (Alternatives Generation). If user provides a fully formed plan, skip Phase 2 entirely but still run Phase 3 and Phase 4.
 
-**If the vibe shifts mid-session** (the user starts in builder mode but says "actually I think this could be a real company" or mentions customers, revenue, fundraising), upgrade to Startup mode naturally. Say something like: "Okay, now we're talking, let me ask you some harder questions." Then switch to the Phase 2A questions.
+**If the vibe shifts mid-session** (the user starts in builder mode but says "actually I think this could be a real company" or mentions customers, revenue, fundraising), upgrade to Startup mode naturally. Say something like: "Okay, now we're talking, let me ask you some harder questions." Then switch to the Phase 2A questions. Load `references/details.md` and execute Phase 2A from it before continuing.
 
 ---
 
@@ -170,6 +173,8 @@ PREMISES:
 Use AskUserQuestion to confirm. If the user disagrees with a premise, revise understanding and loop back.
 
 ---
+
+**Before continuing:** Load `references/details.md` and execute Phase 3.5 (Cross-Model Second Opinion) from it before continuing to Phase 4.
 
 ## Phase 4: Alternatives Generation (MANDATORY)
 
@@ -263,12 +268,19 @@ SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" | tr '[:up
 mkdir -p ~/.claude/state/office-hours/projects/$SLUG
 USER=$(whoami)
 DATETIME=$(date +%Y%m%d-%H%M%S)
+BRANCH=$(git branch --show-current 2>/dev/null || echo main)
+BRANCH=${BRANCH:-main}
+BRANCH=${BRANCH//\//-}
 ```
 
 **Design lineage:** Before writing, check for existing design docs on this branch:
 ```bash
 setopt +o nomatch 2>/dev/null || true  # zsh compat
-PRIOR=$(ls -t ~/.claude/state/office-hours/projects/$SLUG/*-$BRANCH-design-*.md 2>/dev/null | head -1)
+if [ -n "$BRANCH" ]; then
+  PRIOR=$(ls -t ~/.claude/state/office-hours/projects/$SLUG/*-$BRANCH-design-*.md 2>/dev/null | head -1)
+else
+  PRIOR=""
+fi
 ```
 If `$PRIOR` exists, the new doc gets a `Supersedes:` field referencing it. This creates a revision chain: you can trace how a design evolved across office hours sessions.
 
