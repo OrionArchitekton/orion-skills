@@ -95,25 +95,71 @@ def logical_lines(blanked, raw):
 
 
 AGENT_RE = re.compile(r"(?<![\w.])agent\s*\(")
+# A wrapper definition forwards to agent(): `const wrap = (a, b) => agent(a, b)`
+# or `const wrap = (a, b) => { ...; return agent(a, b) }`. The DEF is not an
+# unguarded call: guarding (.catch) and schema live at the wrapper's CALL
+# SITES (a real fan-out script's own wrapper was previously false-flagged here).
+WRAPPER_DEF_RE = re.compile(
+    r"(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>")
 WHILE_RE = re.compile(r"\bwhile\s*\(")
 BUDGET_RE = re.compile(r"budget\.(remaining|spent)\s*\(")
+# bound-agent-context: accumulating a schema-less (longform) agent return hoards
+# unbounded bulk in the orchestrator's live context. Silenced by a schema on the
+# call OR a bound accumulator anywhere in the script.
+ACCUM_RE = re.compile(r"\.push\(|\+=|\bawait\s+pipeline\(|\bawait\s+parallel\(")
+BOUND_RE = re.compile(r"BoundContext|bound_agent_context|boundResults|bound-agent-context")
 
 
 def lint(text):
     blanked = blank_literals_and_comments(text)
     findings = []
+    has_bound = bool(BOUND_RE.search(blanked))
     if not re.search(r"export\s+const\s+meta\s*=\s*\{", blanked):
         findings.append({"rule": "meta-missing", "line": 1,
                          "snippet": "no `export const meta = {` in script"})
-    for start, stmt in logical_lines(blanked, text):
+    # Pass 1: collect wrapper names (defs that forward to agent()) so their
+    # call sites are linted like agent() calls and the defs themselves are not.
+    stmts = list(logical_lines(blanked, text))
+    wrapper_names = set()
+    wrapper_def_lines = set()
+    for start, stmt in stmts:
         bstmt = blank_literals_and_comments(stmt)
-        if AGENT_RE.search(bstmt) and ".catch" not in bstmt:
+        m = WRAPPER_DEF_RE.search(bstmt)
+        if m and AGENT_RE.search(bstmt) and (
+                re.search(r"=>\s*agent\s*\(", bstmt)
+                or re.search(r"\breturn\s+agent\s*\(", bstmt)):
+            wrapper_names.add(m.group(1))
+            wrapper_def_lines.add(start)
+    call_res = [AGENT_RE] + [
+        re.compile(r"(?<![\w.])" + re.escape(w) + r"\s*\(")
+        for w in sorted(wrapper_names)]
+
+    schemaless_agent = None  # (line, stmt) of a longform agent()/wrapper call
+    accumulator = None       # (line, stmt) of an accumulation site
+    for start, stmt in stmts:
+        bstmt = blank_literals_and_comments(stmt)
+        is_wrapper_def = start in wrapper_def_lines
+        is_call = (not is_wrapper_def) and any(
+            r.search(bstmt) for r in call_res)
+        if is_call and ".catch" not in bstmt:
             findings.append({"rule": "no-catch", "line": start,
                              "snippet": stmt.strip()[:120]})
+        if is_call and "schema" not in bstmt and schemaless_agent is None:
+            schemaless_agent = (start, stmt)
+        if ACCUM_RE.search(bstmt) and accumulator is None:
+            accumulator = (start, stmt)
         if WHILE_RE.search(bstmt) and BUDGET_RE.search(bstmt) \
                 and "budget.total" not in bstmt:
             findings.append({"rule": "budget-unguarded", "line": start,
                              "snippet": stmt.strip()[:120]})
+    # unbounded-agent-hoard is flow-insensitive: a schema-less (longform) agent() AND
+    # any accumulator anywhere in the script, with no BoundContext, hoards unbounded
+    # bulk. Detecting only same-statement co-occurrence missed the idiomatic (and
+    # .catch-forced) assign-then-push fan-out.
+    if schemaless_agent and accumulator and not has_bound:
+        line, stmt = accumulator
+        findings.append({"rule": "unbounded-agent-hoard", "line": line,
+                         "snippet": stmt.strip()[:120]})
     return findings
 
 

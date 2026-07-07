@@ -32,6 +32,7 @@ linter before you launch.
 | `no-catch` | Every `agent()` must carry `.catch` (or a wrapper that does). One rate-limit or dead-search reject otherwise rejects the whole `parallel`/`pipeline`; the failure must become a ledger entry plus abstention, not a crash |
 | `budget-unguarded` | `while (budget.remaining() ...)` with no `budget.total` in the condition runs to the 1000-agent cap: with no target, `remaining()` is `Infinity`. Guard: `while (budget.total && budget.remaining() > N)` |
 | `meta-missing` | A script with no `export const meta = {` is rejected at load |
+| `unbounded-agent-hoard` | A schema-less (longform) `agent()` whose returns are accumulated (`pipeline`/`parallel`/`.push`/`+=`) with NO bound accumulator hoards unbounded bulk in the orchestrator's live context. Fix: pass a `schema` (small structured return), or route returns through a bounded accumulator (see Judgment section below) |
 
 ## Judgment the linter cannot check
 
@@ -42,7 +43,19 @@ linter before you launch.
 - **schema vs longform.** Structured data (findings, verdicts) takes a
   `schema`. Human or prose output stays plain text; a schema mangles longform.
 - **Persist bulk to disk.** Subagents write artifacts to files and return
-  pointers or summaries; do not stuff large bodies into `agent()` return values.
+  pointers or summaries; do not stuff large bodies into `agent()` return values. When you DO
+  accumulate many returns, cap and dedupe them in-flight with a small bounded accumulator: budget
+  a total byte cap plus a per-item byte cap, and keep an audit manifest of what was kept versus
+  dropped so the cap is auditable, not silent. A minimal shape:
+  ```js
+  const ctx = new BoundContext({ budgetBytes: 60_000, itemCapBytes: 4_000 })
+  const results = await pipeline(items, d => agent(d.prompt, { schema: SMALL }).catch(() => null))
+  for (const r of results.filter(Boolean)) ctx.add(r.key, JSON.stringify(r))
+  // ctx.retainedBytes stays bounded; ctx.manifest() is the audit tail.
+  ```
+  Build (or reuse) this as a small helper in your own scripts directory (the linter recognizes a
+  `BoundContext` in scope as evidence of a bound accumulator); it does not need to be fancy, just
+  bounded and auditable.
 - **`.filter(Boolean)` before using results.** A failed thunk resolves to
   `null` in `parallel()`/`pipeline()` output; filter before you map.
 - **No `Date.now()` / `Math.random()`** in the script body (they throw in the

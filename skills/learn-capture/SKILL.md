@@ -1,7 +1,7 @@
 ---
 name: learn-capture
 description: |
-  Closing step after a task / review / incident — capture the accreted lessons
+  Closing step after a task / review / incident: capture the accreted lessons
   (what was misunderstood, which assumptions changed, what would speed the next
   pass) and write them DURABLY: behavioral lessons to your agent memory
   (feedback-note style), repo/doctrine lessons to the repo's AGENTS.md or docs/.
@@ -10,7 +10,7 @@ description: |
   (the compound loop's 4th step).
 ---
 
-# Learn Capture — the compound loop's closing step
+# Learn Capture: the compound loop's closing step
 
 Plan → work → review → **capture**. The first three steps solve today's task; this
 one makes the next task cheaper. It converts what the session learned into a durable
@@ -21,7 +21,7 @@ self-closing version of the manual feedback-note habit.
 
 - After a review, PR merge, incident close, or any substantial task lands.
 - When the user says "capture learnings", "what did we learn", "close the loop",
-  "write it up" (for a lesson, not an incident — incidents use `incident-as-code`).
+  "write it up" (for a lesson, not an incident; incidents use `incident-as-code`).
 - Proactively when the session surfaced a non-obvious correction: a wrong
   assumption, a gotcha, a decision-and-rationale, a repeated mistake.
 
@@ -42,7 +42,7 @@ If all three: capture it. If it is a one-off or self-evident from the repo, skip
 
 | Lesson scope | Destination | Form |
 |---|---|---|
-| How I (the agent) should work — corrections, confirmed approaches, gotchas | your agent's memory store (e.g. a `feedback_*.md` note + a one-line index pointer) | the memory schema: fact + **Why:** + **How to apply:** |
+| How I (the agent) should work: corrections, confirmed approaches, gotchas | your agent's memory store (e.g. a `feedback_*.md` note + a one-line index pointer) | the memory schema: fact + **Why:** + **How to apply:** |
 | Repo/product behavior, conventions, constraints not derivable from code | that repo's `AGENTS.md` (or local `CLAUDE.md`) | a terse rule under the right section |
 | A resolved incident's root cause + fix | `docs/solutions/<date>-<slug>.md` | use `incident-as-code` instead |
 | Project state / decisions for an ongoing arc | your project's state register / status doc | per that register's header |
@@ -52,19 +52,26 @@ contract/repo-facing that another contributor needs → AGENTS.md.
 
 ## Process
 
-1. **Reflect** — in 2-4 bullets, name what changed this session: a wrong assumption
+1. **Reflect**: in 2-4 bullets, name what changed this session: a wrong assumption
    corrected, a decision + its rationale, a gotcha hit, a faster path found.
-2. **Filter** — drop anything failing the three-question test above.
-3. **Route** — assign each surviving lesson a destination from the table.
-4. **Write** — durable, concise, second-person-actionable. For memory files follow
+2. **Filter**: drop anything failing the three-question test above.
+3. **Route**: assign each surviving lesson a destination from the table.
+4. **Write**: durable, concise, second-person-actionable. For memory files follow
    the schema (frontmatter `type: feedback|project|user|reference`, body with
    **Why:** and **How to apply:**); link related notes with `[[name]]`; add the
    index pointer line. For AGENTS.md, add the minimal rule, do not restructure.
-5. **Confirm** — list what you captured and where, in one line each.
+   - **Confidence + scope (additive, optional).** A NEW memory note MAY carry
+     `metadata.confidence` (a float `0.0` to `1.0`, your calibrated trust in the
+     lesson) and `metadata.scope` (`global`, or a repo/project id when the
+     lesson is repo-specific). These are optional calibration metadata a
+     future promotion or review process can use to decide what graduates to
+     wider-scoped guidance. OMITTING both is fine and is the legacy default:
+     an unscored note is never auto-promoted. Do NOT back-fill existing notes.
+5. **Confirm**: list what you captured and where, in one line each.
 
 ## Hard rails
 
-- **Memory and AGENTS.md are authority surfaces — additive, minimal diffs only.**
+- **Memory and AGENTS.md are authority surfaces: additive, minimal diffs only.**
   Do not restructure AGENTS.md or rewrite existing memory; append or update one note.
 - Convert relative dates to absolute before writing.
 - Never store secrets or PII in a lesson.
@@ -75,5 +82,5 @@ contract/repo-facing that another contributor needs → AGENTS.md.
 ## Portability
 
 Plain Markdown, tool-agnostic. Under other agent runtimes, write the same files via
-your runtime's file-write mechanism — the destinations and schema are identical;
+your runtime's file-write mechanism; the destinations and schema are identical;
 only the write mechanism differs.
