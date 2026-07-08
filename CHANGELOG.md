@@ -4,6 +4,14 @@ All notable changes to the orion-skills library. This project follows Semantic
 Versioning (https://semver.org): adding a skill is a MINOR bump, a non-breaking change to
 an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
 
+## [0.5.0] - 2026-07-08
+
+Catalog has grown from 25 skills to 26.
+
+### Added
+
+- **delegate**: hands a scoped subagent, bulk, or background task to a non-Anthropic model CLI (Codex on a ChatGPT plan, Grok on a metered xAI key, or a free local model via Ollama) so it runs off the Anthropic budget with that vendor's native tool calling, behind a sandbox and env-scrub gate. Shells out to each vendor's own CLI rather than a router-proxy under `ANTHROPIC_BASE_URL` (a proxy corrupts tool calls). Security rails enforced in code: no sandbox-bypass flags, a whitelist environment scrub, absolute-path CLI resolution, and a read-only sandbox default.
+
 ## [0.4.0] - 2026-07-06
 
 Catalog has grown from 21 skills to 25.

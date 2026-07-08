@@ -62,6 +62,7 @@ their frontmatter.
 | [`document-release`](skills/document-release/SKILL.md) | Post-ship documentation pass: cross-references the diff against README/ARCHITECTURE/CONTRIBUTING/CLAUDE.md, polishes CHANGELOG voice without rewriting history, cleans up TODOS, and always asks before bumping VERSION. | After `/ship`, before the PR merges, when the docs need to catch up to what shipped. |
 | [`office-hours`](skills/office-hours/SKILL.md) | Product-ideation partner: startup mode pushes six forcing questions until "everyone wants this" becomes a named customer with real demand evidence; builder mode is an enthusiastic riff partner for side projects. Both modes end in a reviewed design doc and one concrete next action, never in code. | You have an idea you haven't validated yet, or you're asked "is this worth building". |
 | [`design-consultation`](skills/design-consultation/SKILL.md) | Proposes a complete, coherent design system (aesthetic, typography, color, layout, spacing, motion) as one package, not a menu, with an explicit safe-choices-vs-risks breakdown, then generates a working HTML preview page and writes DESIGN.md as the project's source of truth. | Starting a new project's UI with no DESIGN.md yet, or asked for "design system" / "brand guidelines". |
+| [`delegate`](skills/delegate/SKILL.md) | Hands a scoped subagent, bulk, or background task to a non-Anthropic model CLI (Codex on a ChatGPT plan, Grok on a metered xAI key, or a free local model via Ollama) so it runs off the Anthropic budget with that vendor's native tool calling, behind a sandbox and env-scrub gate. Shells out to each vendor's own CLI; it is not an `ANTHROPIC_BASE_URL` router-proxy (a proxy corrupts tool calls). | You want subagent/workflow fan-out to run on another model off your Anthropic allocation, without the router-proxy tool-calling trap. |
 
 ### Worked examples (one per skill)
 
@@ -165,6 +166,13 @@ their frontmatter.
   The skill proposes a full system in one pass, tells you which choices are safe category
   defaults and which are deliberate risks, generates an HTML preview you can open in a
   browser, and only then writes DESIGN.md.
+- **`delegate`**: "Run this bulk summarize off-budget." `should_delegate` flags it bulk plus
+  cheap-ok, so it routes to a free local model via Ollama; a frontier-coding task routes to
+  Codex on the ChatGPT plan, an X-search task to Grok on a metered key. Each spawns that
+  vendor's own headless CLI (native tool calling, off the Anthropic budget) behind a rail set:
+  no sandbox-bypass flags, a whitelist env-scrub, an absolute-path CLI resolve, and a
+  read-only default. A proxy under `ANTHROPIC_BASE_URL` is avoided on purpose; it corrupts
+  tool calls.
 
 ## Authoring conventions
 
