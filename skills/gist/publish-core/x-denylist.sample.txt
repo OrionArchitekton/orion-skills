@@ -1,4 +1,4 @@
-# x-denylist.sample.txt — YOUR custom redactor patterns.
+# x-denylist.sample.txt: YOUR custom redactor patterns.
 #
 # Copy this to ~/.claude/config/x-denylist.txt (or set $X_DENYLIST_FILE to its
 # path) and replace the examples with YOUR private nouns. Keeping this file

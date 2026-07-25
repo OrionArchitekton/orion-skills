@@ -8,16 +8,16 @@ denylist (loaded from a file *outside* the skill).
 
 No editing needed; these catch the most dangerous leaks for everyone:
 
-- **Secret-shaped tokens** — private-key headers, `Bearer …`, AWS `AKIA…`,
+- **Secret-shaped tokens**: private-key headers, `Bearer …`, AWS `AKIA…`,
   `ghp_`/`glpat-`/`sk-`/`xoxb-` prefixes, JWTs, Doppler `dp.…`, generic
   high-entropy strings (≥40 chars).
-- **Private network coordinates** — RFC-1918 (10/8, 172.16/12, 192.168/16),
+- **Private network coordinates**: RFC-1918 (10/8, 172.16/12, 192.168/16),
   CGNAT/mesh (100.64/10), `localhost:PORT`, `*.internal` / `*.local` /
   `*.svc.cluster.local`.
-- **Absolute home paths** — `/home/<user>/…`, `/Users/<user>/…` (pin an
+- **Absolute home paths**: `/home/<user>/…`, `/Users/<user>/…` (pin an
   author/machine; matter most for code surfaces).
 
-## Your custom denylist (external file — edit THIS, not the code)
+## Your custom denylist (external file: edit THIS, not the code)
 
 Your org-specific nouns live in a file the skill loads at runtime:
 
@@ -34,7 +34,7 @@ case-insensitively; `#` starts a comment. A plain word is a valid regex; use
 **Why a file, not editing `redactor.py`:** your private nouns survive skill
 updates, and you never accidentally publish your own denylist (a map of exactly
 what you consider sensitive) if you share or fork the skill. The skill ships with
-**no** real org nouns — until you create this file, only the universal patterns
+**no** real org nouns, until you create this file, only the universal patterns
 are active, and `redactor.py --check` prints a warning saying so.
 
 | Class to add | Examples for the file |
@@ -48,7 +48,7 @@ are active, and `redactor.py --check` prints a warning saying so.
 ## Policy: abstain if uncertain (fail-closed)
 
 `decision(text)` returns `ABSTAIN` if **any** pattern (built-in or custom)
-matches, and you must not publish past an ABSTAIN — genericize and re-check, or
+matches, and you must not publish past an ABSTAIN. Genericize and re-check, or
 stop. The point is to *refuse and surface*, not to auto-strip and post (which can
 leave a partial leak). Abstaining on a borderline candidate is the correct, safe
 outcome.
@@ -58,7 +58,7 @@ outcome.
 ```bash
 python3 publish-core/selftest.py     # built-ins + the custom loader + cap, all green
 ```
-The self-test is stable regardless of your customization — it proves the built-in
+The self-test is stable regardless of your customization: it proves the built-in
 universals and that a custom file is loaded and applied (via a temp file), so you
 don't have to keep test fixtures in sync with your real denylist.
 

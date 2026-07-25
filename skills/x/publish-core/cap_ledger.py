@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""publish-core cap ledger — per-surface publish-rate limiter.
+"""publish-core cap ledger, per-surface publish-rate limiter.
 
 Date/week-keyed JSON counter at ~/.claude/state/publish-caps.json:
   {"2026-06-18": {"x": 3}}
 
 Reads the PRIOR count at entry (a passing test can mask an off-by-one when a
-function reads its own just-written state — so read first, then write). At cap it
+function reads its own just-written state, so read first, then write). At cap it
 returns "do not continue".
 
 Stdlib-only. All mutations take an exclusive cross-process flock
@@ -94,14 +94,14 @@ def main(argv) -> int:
     if cmd == "check":
         cur = current(surface)
         if cur >= cap:
-            print(f"AT CAP: {surface} {cur}/{cap} for {_bucket(surface)} — do not continue")
+            print(f"AT CAP: {surface} {cur}/{cap} for {_bucket(surface)}, do not continue")
             return 4
         print(f"OK: {surface} {cur}/{cap} for {_bucket(surface)} ({remaining(surface)} remaining)")
         return 0
-    # incr / reserve — both atomic check-and-increment under the cap lock (no TOCTOU)
+    # incr / reserve, both atomic check-and-increment under the cap lock (no TOCTOU)
     new = reserve(surface)
     if new is None:
-        print(f"AT CAP: {surface} already {current(surface)}/{cap} for {_bucket(surface)} — refusing to increment")
+        print(f"AT CAP: {surface} already {current(surface)}/{cap} for {_bucket(surface)}, refusing to increment")
         return 4
     print(f"recorded: {surface} {new}/{cap} for {_bucket(surface)}")
     return 4 if new >= cap else 0

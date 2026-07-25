@@ -4,6 +4,12 @@ All notable changes to the orion-skills library. This project follows Semantic
 Versioning (https://semver.org): adding a skill is a MINOR bump, a non-breaking change to
 an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
 
+## [0.5.1] - 2026-07-24
+
+### Changed
+
+- Normalized punctuation library-wide: every em, en, and horizontal-bar dash (446 occurrences across 37 files) is now a comma, colon, or hyphen. No behavior change. The sweep covers project docs, `SKILL.md` prose, `references/`, and the comments, docstrings, and console strings in `publish-core`; no regex pattern, denylist entry, or test fixture was altered, and the `publish-core` selftests still pass 19/19 and 43/43. Two generator templates (`pre-compact` handoff packs, `incident-as-code` solution docs) were emitting long dashes into every artifact they produced, which this also stops.
+
 ## [0.5.0] - 2026-07-08
 
 Catalog has grown from 25 skills to 26.

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""publish-core X (Twitter) client — direct OAuth1.0a, no SDK.
+"""publish-core X (Twitter) client, direct OAuth1.0a, no SDK.
 
 Signs `POST https://api.x.com/2/tweets` with an X app's OAuth1.0a user-context
 creds (X_API_KEY/X_API_SECRET consumer + X_ACCESS_TOKEN/X_ACCESS_TOKEN_SECRET
 user). The OAuth2 bearer is read-only and cannot post as the user, so it is not
 used here.
 
-Creds are read from the ENVIRONMENT. Populate it however you manage secrets — a
+Creds are read from the ENVIRONMENT. Populate it however you manage secrets, a
 `.env`, `doppler run -- ...`, `op run -- ...`, CI secrets, etc. Nothing is
 hard-coded and no secret is read from disk by this module.
 
@@ -55,7 +55,7 @@ def build_signed_request(text: str, creds: dict) -> dict:
     """Return {method, url, headers, body, oauth_params} for POST /2/tweets.
 
     For the v2 JSON endpoint only the oauth_* params enter the signature base
-    string (the JSON body is not form-encoded, so it is excluded) — the correct
+    string (the JSON body is not form-encoded, so it is excluded), the correct
     OAuth1.0a construction for api.x.com/2/tweets.
     """
     oauth = {
@@ -85,7 +85,7 @@ def build_signed_request(text: str, creds: dict) -> dict:
 
 
 def print_shape(req: dict, text: str) -> None:
-    """Print request SHAPE only — never a token/secret/auth value."""
+    """Print request SHAPE only, never a token/secret/auth value."""
     oauth = req["oauth_params"]
     print(f"  method      : {req['method']}")
     print(f"  url         : {req['url']}")
@@ -148,11 +148,11 @@ def main(argv) -> int:
         common.log_line("x send REFUSED reason=no-real-creds")
         return 0
 
-    # Cap gate (fail-closed, in the LIVE path — not a separate manual step).
+    # Cap gate (fail-closed, in the LIVE path, not a separate manual step).
     # RESERVE the slot BEFORE the irreversible POST: reserve() is an atomic
     # check-and-increment under a cross-process flock, so two concurrent --sends
     # can't both pass the cap and both publish. On an error after send() the slot
-    # stays consumed — fail SAFE by over-counting rather than leave a tweet
+    # stays consumed, fail SAFE by over-counting rather than leave a tweet
     # uncounted. (Same shape as the gist path.)
     import cap_ledger  # local sibling
     reserved = cap_ledger.reserve("x")

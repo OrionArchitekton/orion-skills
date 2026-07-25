@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""publish-core self-test — adversarial checks for the safety primitives.
+"""publish-core self-test, adversarial checks for the safety primitives.
 
 Run: python3 selftest.py    (exit 0 = all pass, 1 = a check failed)
 
@@ -7,10 +7,10 @@ Covers:
   * redactor BUILT-IN universals: a planted secret + RFC-1918 IP + internal host
     + absolute home path are detected, the verdict is ABSTAIN (fail-closed), and
     redact() removes them. Always-on; need no customization.
-  * redactor CUSTOM loader: a user denylist file is loaded and applied — proven
+  * redactor CUSTOM loader: a user denylist file is loaded and applied, proven
     with a temp file, so this test is stable no matter how you customize it.
   * cap_ledger: increments to the cap then BLOCKS (read-prior-at-entry). Temp
-    ledger — never the real one.
+    ledger, never the real one.
   * gist_client (network-free): the backstop marks dirty content abstained /
     clean content publishable, and the arm gate refuses a live create unless the
     arm flag is present.
@@ -30,7 +30,7 @@ _results = []
 
 def _check(name, ok, detail=""):
     _results.append((name, ok))
-    print(f"  [{PASS if ok else FAIL}] {name}" + (f" — {detail}" if detail else ""))
+    print(f"  [{PASS if ok else FAIL}] {name}" + (f", {detail}" if detail else ""))
 
 
 def test_redactor_builtin():
@@ -61,7 +61,7 @@ def test_redactor_custom_loader():
     print("redactor (custom denylist file):")
     with tempfile.TemporaryDirectory() as td:
         cfg = Path(td) / "x-denylist.txt"
-        # last line is a malformed regex (unterminated character set) — it must be
+        # last line is a malformed regex (unterminated character set), it must be
         # SKIPPED (the valid lines still load) but surfaced as a load error, not
         # silently dropped (a silent skip is a hole in a fail-closed guard).
         cfg.write_text("# my org\n\\bACME\\b\nmybox-01\n[unclosed\n")
@@ -116,7 +116,7 @@ def test_gist_client():
     _check("backstop-abstains-on-dirty", plan["clean"] is False,
            f"verdicts={[f['verdict'] for f in plan['files']]}")
     # The plan must carry the MASKED hit snippets (not just classes) so a human
-    # can eyeball each matched value before --ack-public-hits — and never the raw.
+    # can eyeball each matched value before --ack-public-hits, and never the raw.
     hits = plan["files"][0]["hits"]
     masked_vals = [h["masked"] for h in hits]
     _check("plan-keeps-masked-hits", len(hits) >= 1 and all("*" in m for m in masked_vals),
