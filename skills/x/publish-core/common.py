@@ -29,7 +29,7 @@ NUDGE_LOG = STATE_DIR / "publish-nudge.log"
 
 # Per-surface caps. The X daily cap is overridable via $X_DAILY_CAP (default 5)
 # so you don't edit code to retune it. Extend this dict to add surfaces
-# (e.g. "blog": 1) — give each its own env override if you like.
+# (e.g. "blog": 1): give each its own env override if you like.
 def _int_env(name: str, default: int) -> int:
     try:
         return int(os.environ.get(name, str(default)))
@@ -102,7 +102,7 @@ def cap_lock():
 
     The ledger is a read-modify-write on one JSON file shared by every surface and
     every concurrent session. Without a lock, two sends can both read prior=N and
-    both write N+1 — a lost update that over-publishes. flock on a dedicated lock
+    both write N+1, a lost update that over-publishes. flock on a dedicated lock
     file makes check+increment atomic across processes.
 
     POSIX (Linux/macOS) gets real flock. fcntl is imported lazily so this module

@@ -11,7 +11,7 @@ Structured verification pass before creating any PR. Run this BEFORE `gh pr crea
 
 First check for repo-local PR convention. Look for a declared base branch in:
 
-1. Repo-local `CLAUDE.md` or `AGENTS.md` (some repos use a non-`main` default branch — e.g. `develop`, `release`, or a project-specific trunk; never assume `main`)
+1. Repo-local `CLAUDE.md` or `AGENTS.md` (some repos use a non-`main` default branch, e.g. `develop`, `release`, or a project-specific trunk; never assume `main`)
 2. `.claude/pr-config.json` if it exists (field: `baseBranch`)
 
 If no repo-local convention is found, fall back:
@@ -34,7 +34,7 @@ Check that the current branch is NOT the base branch or any protected branch dec
 
 Check for and execute repo-local preflight in this order:
 
-1. `.claude/hooks/pre-commit.sh` — if present and executable, run it
+1. `.claude/hooks/pre-commit.sh`, if present and executable, run it
 2. Repo-declared CI contract commands from `CLAUDE.md` or `AGENTS.md` (e.g., `pytest`, `npm test`, `bun test`)
 
 If no repo-local preflight exists, report as INFO: "No repo-local preflight found."
@@ -47,10 +47,10 @@ Scan the diff against the base branch for credential patterns:
 git diff <base-branch>...HEAD
 ```
 
-Patterns to check (advisory — not a policy gate):
+Patterns to check (advisory, not a policy gate):
 - `password`, `secret`, `token`, `api_key`, `apikey`, `private_key`, `auth_token` followed by assignment with a string value
 - Base64-encoded strings longer than 40 characters that look like keys
-- Your secrets manager's documented token prefixes (most managers publish a recognizable prefix for service/personal tokens — add yours here)
+- Your secrets manager's documented token prefixes (most managers publish a recognizable prefix for service/personal tokens, add yours here)
 
 If hits are found, report as BLOCKING (secrets are the one advisory pattern that blocks).
 

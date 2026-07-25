@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""publish-core gist client — publish an embeddable PUBLIC gist of content that is
+"""publish-core gist client, publish an embeddable PUBLIC gist of content that is
 ALREADY public.
 
 WHY derive-from-public: a gist is a CODE surface, and a prose redactor is an
 insufficient guard for real source (it enumerates private nouns; it cannot prove
 the absence of an embedded secret or a structural leak). So this client NEVER
 publishes arbitrary local code. It fetches content from a PUBLIC repo over the
-UNAUTHENTICATED raw URL — if that 200s, the content is provably world-readable
+UNAUTHENTICATED raw URL, if that 200s, the content is provably world-readable
 already, which makes "already public" a structural fact, not a promise. The
 redactor still runs as a belt-and-suspenders backstop. See
 references/DERIVE-FROM-PUBLIC.md.
@@ -19,7 +19,7 @@ SAFETY (same shape as the /x client):
     ~/.claude/state/gist-publishers-armed, both absent by default) AND room
     under the daily cap. Disarmed or at-cap -> refuse.
   * Auth for the create is your existing `gh` token (needs the `gist` scope); no
-    secret is read or printed here — `gh` handles it.
+    secret is read or printed here, `gh` handles it.
 
 Source repo: pass --repo OWNER/REPO (or set $GIST_SOURCE_REPO); ref defaults to
 `main` (or $GIST_SOURCE_REF).
@@ -77,7 +77,7 @@ def fetch_public(repo: str, ref: str, path: str, timeout: int = 15) -> str:
     """GET the path over the UNAUTHENTICATED raw URL.
 
     Success is the proof the content is already world-readable. A 404 means the
-    path/ref is wrong OR the repo is not public — either way, do NOT publish.
+    path/ref is wrong OR the repo is not public, either way, do NOT publish.
     """
     url = raw_url(repo, ref, path)
     req = urllib.request.Request(url, headers={"User-Agent": "publish-core-gist"})
@@ -91,14 +91,14 @@ def fetch_public(repo: str, ref: str, path: str, timeout: int = 15) -> str:
             if resp.status != 200 or final_netloc != RAW_NETLOC:
                 raise RuntimeError(
                     f"raw fetch {url} resolved to {final_netloc} (status {resp.status}); "
-                    f"refusing — the already-public proof requires a 200 from {RAW_NETLOC}"
+                    f"refusing, the already-public proof requires a 200 from {RAW_NETLOC}"
                 )
             try:
                 return resp.read().decode("utf-8")
             except UnicodeDecodeError as exc:
                 raise RuntimeError(
                     f"raw fetch {url} returned binary or non-UTF-8 content; refusing "
-                    "(a gist publishes text — fetch the textual source path)"
+                    "(a gist publishes text, fetch the textual source path)"
                 ) from exc
     except urllib.error.HTTPError as exc:
         raise RuntimeError(
@@ -155,7 +155,7 @@ def build_plan(files: dict, repo: str, ref: str, description: str) -> dict:
             # moving ref (e.g. main) can't publish content the human never saw.
             "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
             "hit_classes": sorted({c for c, _ in hits}),
-            # Keep the MASKED snippets (never raw secrets — redactor.scan masks
+            # Keep the MASKED snippets (never raw secrets, redactor.scan masks
             # them) so a human can eyeball each matched value before --ack-public-hits.
             "hits": [{"class": c, "masked": m} for c, m in hits],
         })
@@ -246,7 +246,7 @@ def main(argv) -> int:
             i += 1
 
     if not repo:
-        print("error: source repo required — pass --repo OWNER/REPO or set "
+        print("error: source repo required, pass --repo OWNER/REPO or set "
               "$GIST_SOURCE_REPO (must be a PUBLIC repo)", file=sys.stderr)
         return 2
     if not paths:
@@ -272,7 +272,7 @@ def main(argv) -> int:
         # the user asked for. (--filename is already barred with multiple paths.)
         if name in files:
             print(f"error: duplicate gist filename {name!r} from path {p!r}; "
-                  "two sources share a basename — rename one or fetch them in "
+                  "two sources share a basename, rename one or fetch them in "
                   "separate gists", file=sys.stderr)
             common.log_line(f"gist REFUSED reason=filename-collision name={name}")
             return 2
@@ -291,7 +291,7 @@ def main(argv) -> int:
     if not plan["clean"]:
         hit_classes = sorted({c for f in plan["files"] for c in f["hit_classes"]})
         if not ack_hits:
-            print("VERDICT: ABSTAIN — redactor backstop flagged already-public content.")
+            print("VERDICT: ABSTAIN, redactor backstop flagged already-public content.")
             print_plan(plan)
             print(f"\n  hit classes: {hit_classes}")
             print("  This is a backstop on already-public content (the raw fetch proved it is")
@@ -325,7 +325,7 @@ def main(argv) -> int:
     # have changed since the dry-run review. --expect-sha256 or an immutable commit
     # SHA as --ref removes the gap.
     if not expect_sha and not is_immutable_ref(ref):
-        print(f"WARNING: sending without --expect-sha256 and ref {ref!r} can move — "
+        print(f"WARNING: sending without --expect-sha256 and ref {ref!r} can move, "
               "the published bytes may differ from the dry-run you reviewed. Pin with "
               "--expect-sha256 <name>=<sha256> (printed by the dry-run) or pass an "
               "immutable commit SHA as --ref.", file=sys.stderr)
@@ -351,11 +351,11 @@ def main(argv) -> int:
                 common.log_line(f"gist send REFUSED reason=sha-mismatch name={fn}")
                 return 3
 
-    # 6. Cap gate (fail-closed, in the LIVE path — not a separate manual step).
+    # 6. Cap gate (fail-closed, in the LIVE path, not a separate manual step).
     #    RESERVE the slot BEFORE the irreversible create: reserve() is an atomic
     #    check-and-increment under a cross-process flock, so two concurrent
     #    --sends can't both pass the cap and both create. On a crash after
-    #    `gh gist create` the slot stays consumed — fail SAFE by over-counting
+    #    `gh gist create` the slot stays consumed, fail SAFE by over-counting
     #    rather than leave a public gist uncounted.
     import cap_ledger  # local sibling
     reserved = cap_ledger.reserve("gist")

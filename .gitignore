@@ -16,7 +16,7 @@ node_modules/
 __pycache__/
 *.pyc
 
-# Local env / secrets — never commit
+# Local env / secrets: never commit
 .env
 .env.*
 *.pem

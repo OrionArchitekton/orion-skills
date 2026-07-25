@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# session-injector.sh — thin, FAIL-OPEN session-start injector for the tools-router
-# (illustrative skeleton — adapt the table path + the injection mechanism to your harness).
+# session-injector.sh: thin, FAIL-OPEN session-start injector for the tools-router
+# (illustrative skeleton: adapt the table path + the injection mechanism to your harness).
 #
 # It does ZERO probing: it reads the PRE-RENDERED table the periodic recon produced and
 # emits it as session context. The recon earns "assume authed"; this hook just serves the
-# cached artifact cheaply. Any error exits 0 — a session must NEVER block on the index.
+# cached artifact cheaply. Any error exits 0: a session must NEVER block on the index.
 trap 'exit 0' EXIT
 set +e
 
@@ -18,11 +18,11 @@ BODY="$(sed '/^<!--/d' "$TABLE")"               # strip the generated-maintenanc
 BANNER=""
 # Staleness: a table older than (recon interval x a few) means the periodic recon missed.
 if [ -n "$(find "$TABLE" -mtime +10 2>/dev/null)" ]; then
-  BANNER="NOTE: tools index >10d old — the recon job may not be firing; re-run it. "
+  BANNER="NOTE: tools index >10d old, the recon job may not be firing; re-run it. "
 fi
 # Flags: surface unauthenticated tools / dedup recs the recon recorded.
 if [ -r "$FLAGS" ] && [ -s "$FLAGS" ]; then
-  BANNER="${BANNER}NOTE: tool flags present — see the flags file. "
+  BANNER="${BANNER}NOTE: tool flags present, see the flags file. "
 fi
 
 # Emit however your harness ingests session context (stdout, a JSON envelope, a file...).

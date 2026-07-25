@@ -11,14 +11,14 @@ returns yes/no + a reason. Therefore:
 - A condition the evaluator **cannot verify from the transcript never converges** (or worse,
   converges falsely). "All 11 files exist", "tests pass", "the queue is empty" are uncheckable
   unless the run SURFACES fresh proof.
-- The condition must demand **FRESH tool output in ONE final turn** — `wc -l`, `git diff --stat`,
-  `grep`/`awk`, `ls`, `git status --porcelain` — pasted into the transcript that same turn.
+- The condition must demand **FRESH tool output in ONE final turn**: `wc -l`, `git diff --stat`,
+  `grep`/`awk`, `ls`, `git status --porcelain`, pasted into the transcript that same turn.
   **Pre-compaction evidence does not count** (it's no longer in the evaluator's view).
 
 Do NOT copy the template below blindly. Derive each clause from "what fresh transcript evidence
 proves this sub-goal to a model that can't look at the filesystem?"
 
-## Full contract (default) — clause checklist
+## Full contract (default): clause checklist
 
 1. **Brief pointer + scope:** "Execute the GOAL BRIEF at <path> end to end, <READ-ONLY | rails>;
    load recon seed <path>.recon.json FIRST and VERIFY it."
@@ -39,12 +39,12 @@ proves this sub-goal to a model that can't look at the filesystem?"
 
 ## ≤ 4000 chars (hard `/goal` limit) + overflow degradation
 
-The condition references the BRIEF and specifies the *evidence SHAPE* — NOT every deliverable
-inline. That is why real full-contract conditions land ~2.6–3.2k chars. On overflow:
+The condition references the BRIEF and specifies the *evidence SHAPE*, NOT every deliverable
+inline. That is why real full-contract conditions land ~2.6-3.2k chars. On overflow:
 - push per-deliverable enumeration into the brief (`00_EXECUTIVE_SUMMARY.md` / the brief itself);
 - keep the condition to {brief-pointer + evidence-shape + self-audit + attestation + ALT}.
-- **Count the chars yourself** before handing off — `wc -c <name>.goal-condition.txt` (or `wc -m`
-  on the condition text) — and if it exceeds 4000, degrade as above and flag it. There is no
+- **Count the chars yourself** before handing off, `wc -c <name>.goal-condition.txt` (or `wc -m`
+  on the condition text), and if it exceeds 4000, degrade as above and flag it. There is no
   auto-counter; this is a manual self-audit step.
 
 **Paired (research+implement) shapes emit TWO condition files**, phase-suffixed:
@@ -53,18 +53,18 @@ The implement condition swaps the rails-attestation clause for a PRECONDITION as
 path + SHA/date) + target-appropriate verification (see prompt-scaffold.md implement rails).
 
 **Settled decisions are NOT graded as a user-facing decision table.** A condition clause may require
-fresh evidence that each settled value still holds against live state (it CAN drift) — recorded as
-EVIDENCE in the MAP's decision-evidence table — but the GATE deliverable the condition checks for
+fresh evidence that each settled value still holds against live state (it CAN drift), recorded as
+EVIDENCE in the MAP's decision-evidence table, but the GATE deliverable the condition checks for
 enumerates ONLY genuinely-open items plus a one-line settled-decisions assert banner. Writing the
 clause as "the DECISION table CONFIRMS each LOCKED value with a verdict + confidence" re-materializes
-the locked rows as a user-facing decision every run — the cross-session re-gate bug. Confirm-against-
+the locked rows as a user-facing decision every run, the cross-session re-gate bug. Confirm-against-
 live (evidence, silent if it holds) and present-to-the-user (a choice) are different operations; keep them
 apart. A settled value that live state AFFIRMATIVELY contradicts surfaces as a BLOCKING finding, not a
 gate row; an absent/not-yet-created probe is EXPECTED, never a contradiction. Positive clause shape
 (use this, NOT a verdict table): "(N) a fresh grep proving the MAP's decision-EVIDENCE table records
 each LOCKED value confirmed-against-live (or flags any affirmative contradiction BLOCKING), AND that
 the gate section lists ONLY the open forks plus a one-line settled-decisions assert banner." The
-clause checks the SHAPE of the MAP evidence — it never asks the run to re-decide a locked value.
+clause checks the SHAPE of the MAP evidence, it never asks the run to re-decide a locked value.
 
 ## Worked skeleton (read-only audit)
 

@@ -8,20 +8,19 @@ disable-model-invocation: true
 
 Structural read-only rail for audit / research / census work. Activating it makes
 the `pretooluse-readonly` PreToolUse hook DENY every file-mutating tool
-(Edit/Write/MultiEdit/NotebookEdit) for the rest of the session — until cleared.
+(Edit/Write/MultiEdit/NotebookEdit) for the rest of the session, until cleared.
 
 It is the sister of `scope-guard`: scope-guard constrains *where* you may write;
-read-only mode constrains *whether* you may write at all. Same proven mechanism —
-an opt-in, fail-open session marker + a PreToolUse `permissionDecision: deny`.
+read-only mode constrains *whether* you may write at all. Same proven mechanism, an opt-in, fail-open session marker + a PreToolUse `permissionDecision: deny`.
 
 ## When to use
 
 - An explicit audit / research / read-only census where NO file should change.
 - Backstopping read-only subagents with a hard structural rail, not just
   behavioral discipline (the PreToolUse payload carries no subagent identity, so
-  the marker is session-global — enter read-only, do the read-only work, clear).
+  the marker is session-global, enter read-only, do the read-only work, clear).
 
-## Activation — the marker lifecycle
+## Activation: the marker lifecycle
 
 The enforcement hook is INERT until the marker is set. Use a small helper to
 manage the marker; do not hand-write the marker JSON:
@@ -43,12 +42,12 @@ again). No marker = no enforcement (safe default).
 
 ## Discipline
 
-- Set BEFORE the read-only work; clear AFTER — prefer clearing in the same turn
+- Set BEFORE the read-only work; clear AFTER, prefer clearing in the same turn
   (or a trap) so a crash doesn't strand the session, and others, read-only. The
   marker is a file on disk: a stranded `active` marker blocks writes in the NEXT
   session too until someone runs `off`.
 - Read scope is unrestricted; only writes are blocked.
-- No-hook environments: the hook is absent — apply read-only discipline
+- No-hook environments: the hook is absent, apply read-only discipline
   manually (the marker is a no-op there).
 
 ## What this does NOT do

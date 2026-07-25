@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""reference-recon.py — the tools-router generator PATTERN (illustrative skeleton).
+"""reference-recon.py, the tools-router generator PATTERN (illustrative skeleton).
 
 Probes the CLIs + MCP servers a harness can reach, captures auth/health state WITHOUT
 persisting raw secret-bearing output, computes AUTH-AWARE dedup recommendations, and
 renders a compact index. Adapt the probe table, the MCP-list source, and the render to
-your environment — this is a teaching skeleton, not drop-in code.
+your environment, this is a teaching skeleton, not drop-in code.
 
 Run it OUT of band (a timer/cron/CI job), never on the session hot path.
 """
@@ -24,15 +24,14 @@ def redact(s: str) -> str:
     return s
 
 # --- per-tool auth detection: NON-uniform. Each predicate is AFFIRMATIVE (find a
-#     logged-in marker) over exit code AND a content signal — never "no error seen". ------
+#     logged-in marker) over exit code AND a content signal: never "no error seen". ------
 def authed_if_rc0(rc, out):           return "authed" if rc == 0 else "unauthed"
 def authed_if_active_marker(rc, out): return "authed" if any(l.lstrip().startswith("*") for l in out.splitlines()) else "unauthed"
 def authed_if_config(rc, out):        return "config_present" if (rc == 0 and "[default]" in out) else "no_config"  # local read != live auth
 def authed_env(var):                  return "authed" if os.environ.get(var) else "indeterminate"  # env-var auth: indeterminate without the runtime env
 
 # probe = (argv, detector, secret_bearing). secret_bearing probes never return their stdout.
-# Tool names below are obviously-fake placeholders (except `gh`, a ubiquitous public example) —
-# substitute your real CLIs.
+# Tool names below are obviously-fake placeholders (except `gh`, a ubiquitous public example): # substitute your real CLIs.
 PROBES = {
     "gh":        (["gh", "auth", "status"],          authed_if_rc0,           False),
     "cloudcli":  (["cloudcli", "auth", "list"],      authed_if_active_marker, False),  # rc0 even w/ 0 accounts -> parse the marker
@@ -53,7 +52,7 @@ def probe_cli(name, runner=_run):
     rc, out = runner(argv, 12)
     state = detect(rc, out)
     # CRITICAL: never return raw stdout. A non-secret identity (account/email/org) is valuable
-    # in the index but is omitted from this skeleton for safety — to add it, extract ONLY the
+    # in the index but is omitted from this skeleton for safety, to add it, extract ONLY the
     # principal with a per-tool regex and pass it through redact(), never the raw output.
     return state, ""
 
@@ -65,7 +64,7 @@ def parse_mcp_list(text):
     for raw in text.splitlines():
         line = raw.rstrip()
         if not line or ": " not in line:
-            continue  # blank / preamble — not a server row (no id separator)
+            continue  # blank / preamble, not a server row (no id separator)
         sid, rest = line.split(": ", 1)
         # Do NOT also require a layout delimiter like " - ": a harness with a different
         # column layout must still keep the row (as 'unknown'), never silently drop it.

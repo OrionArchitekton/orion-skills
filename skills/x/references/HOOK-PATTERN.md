@@ -1,9 +1,9 @@
-# Auto-trigger pattern — a hook that NUDGES (never posts)
+# Auto-trigger pattern: a hook that NUDGES (never posts)
 
 The autonomous half of `/x` is optional and environment-specific, so it ships as a
 pattern to adapt rather than wired code. A hook is shell: it cannot run a skill or
 post. It can only emit `additionalContext` to nudge the in-session model to
-consider publishing — through the same redactor + cap + arm gates.
+consider publishing, through the same redactor + cap + arm gates.
 
 ## Shape
 
@@ -13,7 +13,7 @@ it in `settings.json` under `"hooks": { "Stop": [ … ] }`.
 
 ```bash
 #!/usr/bin/env bash
-# Stop hook — publish nudge. NUDGES only; never posts. Ships DISARMED.
+# Stop hook: publish nudge. NUDGES only; never posts. Ships DISARMED.
 trap 'exit 0' EXIT          # fail-OPEN: a never-emitted nudge must never block a Stop
 set +e
 command -v jq >/dev/null 2>&1 || exit 0
@@ -39,7 +39,7 @@ DB="$STATE/publish-nudged-${SID}.json"
 python3 "$CORE/cap_ledger.py" check x >/dev/null 2>&1
 [ $? -eq 4 ] && { log "skipped reason=at-cap"; exit 0; }
 
-# (Plug in your own "is there a fresh signal?" check here — see below.)
+# (Plug in your own "is there a fresh signal?" check here: see below.)
 # If nothing fresh: log "skipped reason=no-fresh-signals"; exit 0
 
 printf '{"at":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$DB" 2>/dev/null
@@ -54,7 +54,7 @@ exit 0
 What counts as a publishable signal is yours to define. A simple version: a note
 file written in the last N hours that you haven't already acted on. Track what
 you've published in a small JSON dedup set under `~/.claude/state/` so the same
-signal isn't surfaced twice — and, on a shared/multi-session box, remember that a
+signal isn't surfaced twice, and, on a shared/multi-session box, remember that a
 recency window over a shared notes directory will surface OTHER sessions' notes
 too. Only publish what the current session actually produced and can genericize.
 
@@ -62,8 +62,8 @@ too. Only publish what the current session actually produced and can genericize.
 
 - **Fail-open** (`trap 'exit 0'; set +e`, never `set -e`/`exec`): a broken hook
   must not block a Stop.
-- **Log to a file, never `/dev/null`** — a silent probe failure must not look like
+- **Log to a file, never `/dev/null`**: a silent probe failure must not look like
   success.
-- **Disarmed by default** — the arm-flag check is the first gate; with no flag the
+- **Disarmed by default**: the arm-flag check is the first gate; with no flag the
   hook emits nothing.
 - The hook nudges; the *model* runs `/x`, which still enforces redactor + cap + arm.

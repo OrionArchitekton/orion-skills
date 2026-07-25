@@ -12,7 +12,7 @@ Take a finished change from passing tests to verified-live without claiming succ
 
 **Core directive:** Run tests (RED/GREEN), open a PR, run adversarial self-review for fail-open/auditability gaps, then live-verify before reporting done.
 
-**Violating the letter of the gates is violating the spirit of the gates.** Cheap proxies — a green deploy, green CI, a stale LGTM, "I'm confident" — are necessary-at-most, never sufficient.
+**Violating the letter of the gates is violating the spirit of the gates.** Cheap proxies, a green deploy, green CI, a stale LGTM, "I'm confident", are necessary-at-most, never sufficient.
 
 ## When to Use
 
@@ -23,10 +23,10 @@ Do NOT use for: brainstorming, mid-implementation work, or anything with no diff
 
 ## Steps
 
-1. **Run tests (RED/GREEN).** Confirm the relevant test fails RED before the fix and passes GREEN after. Run the repo's declared test + lint commands (repo-local `CLAUDE.md` / `AGENTS.md` / CI contract) — **a green CI run is not a substitute for re-running the declared tests yourself.** **No declared test suite RAISES rigor — it is never a license to skip Gate 1.** On any security/authz path, hand-roll a failing default-deny check (RED) and make it pass (GREEN) before claiming done. State exactly what you ran.
-2. **Open a PR.** Re-detect the base branch from repo PR convention even if you think you know it; fall back to `git remote show origin` default. Never assume `main`. **A prior or verbal LGTM is permission, not evidence** — re-request approval on the *post-edit* diff; never downgrade re-review to an opt-out "flag me if…". Show a diff summary before committing. Never force-push.
-3. **Adversarial self-review for fail-open / auditability gaps.** Attack your own change: Where does it fail OPEN instead of fail-closed? Which mutation or decision goes unreceipted / unaudited? What state is asserted but never verified? **If you find a fail-open or bypass path, first challenge whether it should exist at all — prefer ELIMINATING it over making it "safe".** Report findings severity-graded — **BLOCKING** / **WARNING** / **INFO**. Fix BLOCKING before proceeding. This pass is mandatory; it is not optional "ceremony" you skip because tests are green.
-4. **Live-verify before reporting done.** Independently confirm runtime via the repo/host's declared verification path (container status, systemd status, health endpoint, env render, connectivity). **A green deploy/CI is not runtime proof.** If independent verification is impossible, say "unverifiable / not done" explicitly — do NOT claim success, and do NOT substitute a forward-promise ("will verify") for the claim.
+1. **Run tests (RED/GREEN).** Confirm the relevant test fails RED before the fix and passes GREEN after. Run the repo's declared test + lint commands (repo-local `CLAUDE.md` / `AGENTS.md` / CI contract), **a green CI run is not a substitute for re-running the declared tests yourself.** **No declared test suite RAISES rigor, it is never a license to skip Gate 1.** On any security/authz path, hand-roll a failing default-deny check (RED) and make it pass (GREEN) before claiming done. State exactly what you ran.
+2. **Open a PR.** Re-detect the base branch from repo PR convention even if you think you know it; fall back to `git remote show origin` default. Never assume `main`. **A prior or verbal LGTM is permission, not evidence**: re-request approval on the *post-edit* diff; never downgrade re-review to an opt-out "flag me if…". Show a diff summary before committing. Never force-push.
+3. **Adversarial self-review for fail-open / auditability gaps.** Attack your own change: Where does it fail OPEN instead of fail-closed? Which mutation or decision goes unreceipted / unaudited? What state is asserted but never verified? **If you find a fail-open or bypass path, first challenge whether it should exist at all, prefer ELIMINATING it over making it "safe".** Report findings severity-graded, **BLOCKING** / **WARNING** / **INFO**. Fix BLOCKING before proceeding. This pass is mandatory; it is not optional "ceremony" you skip because tests are green.
+4. **Live-verify before reporting done.** Independently confirm runtime via the repo/host's declared verification path (container status, systemd status, health endpoint, env render, connectivity). **A green deploy/CI is not runtime proof.** If independent verification is impossible, say "unverifiable / not done" explicitly, do NOT claim success, and do NOT substitute a forward-promise ("will verify") for the claim.
 
 ## Quick Reference
 
@@ -37,7 +37,7 @@ Do NOT use for: brainstorming, mid-implementation work, or anything with no diff
 | Self-review | Fail-open eliminated or graded; no unaddressed BLOCKING |
 | Live-verify | Runtime confirmed by declared path, or "unverifiable / not done" stated |
 
-## Rationalizations — and why they fail
+## Rationalizations: and why they fail
 
 Captured verbatim from baseline (RED) testing of agents *without* this skill:
 
@@ -53,7 +53,7 @@ Captured verbatim from baseline (RED) testing of agents *without* this skill:
 | "No test suite here, so move fast." | No suite RAISES rigor; hand-roll RED→GREEN, especially on authz paths. Gate 1. |
 | "I'll make the bypass safe." | First ask whether the bypass should exist at all; prefer elimination. Gate 3. |
 
-## Red Flags — STOP, you are about to ship on faith
+## Red Flags: STOP, you are about to ship on faith
 
 - "Confident" / "probably still pass" → run the tests.
 - "It deployed / CI green, so it works" → live-verify runtime, not the exit code.
@@ -64,4 +64,4 @@ Captured verbatim from baseline (RED) testing of agents *without* this skill:
 
 ## Boundary
 
-This `ship` is a **finish-discipline checklist** — it governs the *quality gates* between green and done. It is **not** a deploy-mechanics skill and is **not authoritative for deploy mechanics**. Deploy decisions, targets, and tooling defer to your project's own deploy doctrine (deploy targets, secrets manager, worktree/branch discipline) per your repo's `AGENTS.md` / `CLAUDE.md`. This skill only governs *whether you may call it done* — route the *how/where* of deploy to your project's canonical deploy process.
+This `ship` is a **finish-discipline checklist**: it governs the *quality gates* between green and done. It is **not** a deploy-mechanics skill and is **not authoritative for deploy mechanics**. Deploy decisions, targets, and tooling defer to your project's own deploy doctrine (deploy targets, secrets manager, worktree/branch discipline) per your repo's `AGENTS.md` / `CLAUDE.md`. This skill only governs *whether you may call it done*, route the *how/where* of deploy to your project's canonical deploy process.

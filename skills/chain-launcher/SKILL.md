@@ -1,15 +1,15 @@
 ---
 name: chain-launcher
-description: Use right after you approve a research/decision plan (a MAP) to surface the exact next command for the implement phase — making the research → approve → implement hand-off frictionless without auto-crossing the approval gate. Triggers — /chain-launcher, "what's the next goal line", "advance the chain", "fire the implement step". Never auto-fires the next phase (the gate is a deliberate human fire); does not build the prompt (that is goal-prompt).
+description: Use right after you approve a research/decision plan (a MAP) to surface the exact next command for the implement phase, making the research → approve → implement hand-off frictionless without auto-crossing the approval gate. Triggers, /chain-launcher, "what's the next goal line", "advance the chain", "fire the implement step". Never auto-fires the next phase (the gate is a deliberate human fire); does not build the prompt (that is goal-prompt).
 ---
 
-# Chain Launcher — surface the next command on plan approval
+# Chain Launcher: surface the next command on plan approval
 
 ## Overview
 
 The compounding pattern for autonomous work is: **build the prompt → run the
 research/decision phase → a human approves the plan → run the implement phase.** The
-research→implement gate is a **separate human fire by construction** — a long
+research→implement gate is a **separate human fire by construction**: a long
 autonomous run returns control only on completion, and there is no mid-run input to
 inject an approval into, so nothing can (or should) auto-cross the approval gate.
 
@@ -23,20 +23,20 @@ it. Convenience over re-typing.
 - Triggers: `/chain-launcher`, "what's the next goal line", "advance the chain".
 
 **When NOT to use:**
-- To auto-fire the next phase — never; the gate is a deliberate human fire.
-- To BUILD the prompt — that is `goal-prompt`.
+- To auto-fire the next phase, never; the gate is a deliberate human fire.
+- To BUILD the prompt, that is `goal-prompt`.
 
 ## Procedure
 1. Identify the topic stem you used when you authored the prompt set (e.g.
    `timer-audit`).
 2. Locate the paired **implement** prompt/launcher you saved for that stem and print
-   its fire line **verbatim** — that IS the command to run. A tiny report-only helper
+   its fire line **verbatim**: that IS the command to run. A tiny report-only helper
    that globs your prompts directory for `<stem>-implement-*` removes the friction; it
-   reads and prints only — it fires nothing.
-3. **Bind to the plan you just approved — never guess on ambiguity.** If more than one
+   reads and prints only, it fires nothing.
+3. **Bind to the plan you just approved, never guess on ambiguity.** If more than one
    launcher matches the stem, do NOT print one: list the candidates and **stop for the
    human to pick the one tied to the approved plan** (matched by the plan's id / date /
-   sha). Do *not* auto-select "the newest" — that is not a binding to the approval and
+   sha). Do *not* auto-select "the newest", that is not a binding to the approval and
    can surface a stale or sibling launcher, exactly the failure this gate exists to
    prevent.
 4. The human reviews and fires it (editing the DO set inline first if the approval
@@ -45,7 +45,7 @@ it. Convenience over re-typing.
 ## Rails
 - **Never auto-fire.** Print the line; the human fires it. The gate is a separate,
   deliberate fire.
-- The helper is **report-only** — it reads and prints; it writes nothing and runs
+- The helper is **report-only**: it reads and prints; it writes nothing and runs
   nothing.
 - **Bind to the approval.** On more than one match, list the candidates and stop for
   human selection; never auto-pick (not even "the newest") and never fire a launcher you

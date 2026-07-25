@@ -24,7 +24,7 @@ CAPS_PATH = STATE_DIR / "publish-caps.json"
 CAPS_LOCK_PATH = STATE_DIR / "publish-caps.lock"
 PROCESSED_PATH = STATE_DIR / "publish-processed.json"
 ARM_FLAG_PATH = STATE_DIR / "publishers-armed"
-# A gist is a CODE surface — higher-risk than prose. It must NOT inherit "armed"
+# A gist is a CODE surface: higher-risk than prose. It must NOT inherit "armed"
 # from the shared flag a lower-risk prose surface (e.g. /x) set before gist
 # existed. A live gist therefore requires BOTH flags (see is_gist_armed()).
 GIST_ARM_FLAG_PATH = STATE_DIR / "gist-publishers-armed"
@@ -33,7 +33,7 @@ NUDGE_LOG = STATE_DIR / "publish-nudge.log"
 
 # Per-surface caps. The gist daily cap is overridable via $GIST_DAILY_CAP
 # (default 2) so you don't edit code to retune it. Extend this dict to add
-# surfaces — give each its own env override if you like.
+# surfaces: give each its own env override if you like.
 def _int_env(name: str, default: int) -> int:
     try:
         return int(os.environ.get(name, str(default)))
@@ -84,8 +84,7 @@ def is_armed() -> bool:
     disarm by removing it.
 
     NOTE: a CODE surface (like gist) requires a SECOND, surface-specific flag on
-    top of this one so it can't inherit "armed" from a lower-risk prose surface —
-    see is_gist_armed() and references/DERIVE-FROM-PUBLIC.md.
+    top of this one so it can't inherit "armed" from a lower-risk prose surface, see is_gist_armed() and references/DERIVE-FROM-PUBLIC.md.
     """
     return ARM_FLAG_PATH.exists()
 
@@ -93,7 +92,7 @@ def is_armed() -> bool:
 def is_gist_armed() -> bool:
     """A live gist requires BOTH the shared flag AND its own flag.
 
-    A gist publishes CODE to the public internet under your account — a strictly
+    A gist publishes CODE to the public internet under your account, a strictly
     higher-risk surface than a prose poster. Requiring a gist-specific flag means
     arming /x (or any prose publisher) never silently arms gist; removing the
     shared flag still disarms everything. Arm a live gist with BOTH:
@@ -123,7 +122,7 @@ def cap_lock():
 
     The ledger is a read-modify-write on one JSON file shared by every surface and
     every concurrent session. Without a lock, two sends can both read prior=N and
-    both write N+1 — a lost update that over-publishes. flock on a dedicated lock
+    both write N+1, a lost update that over-publishes. flock on a dedicated lock
     file makes check+increment atomic across processes.
 
     POSIX (Linux/macOS) gets real flock. fcntl is imported lazily so this module

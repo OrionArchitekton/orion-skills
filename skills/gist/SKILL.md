@@ -1,7 +1,7 @@
 ---
 name: gist
 description: |
-  Publish an embeddable PUBLIC GitHub gist of material that is ALREADY public — a
+  Publish an embeddable PUBLIC GitHub gist of material that is ALREADY public, a
   path in a public repo, fetched over the unauthenticated raw URL so its
   world-readability is a structural fact, not a promise. The shared redactor runs
   as a backstop, a per-day cap is enforced in the live path, and it ships DISARMED
@@ -11,11 +11,11 @@ description: |
 disable-model-invocation: true
 ---
 
-# /gist — publish an embeddable gist of ALREADY-public content
+# /gist: publish an embeddable gist of ALREADY-public content
 
 This is not a gist wrapper. It is a discipline skill: how to let an agent publish
 to a **code** surface safely. A prose redactor cannot prove the absence of an
-embedded secret or a structural leak in real source — so instead of trusting a
+embedded secret or a structural leak in real source, so instead of trusting a
 scanner on code, `/gist` only ever republishes content it fetched from a **public
 repo over the unauthenticated raw URL**. If that fetch 200s, the content is
 already world-readable; re-publishing it as a gist discloses nothing new. That
@@ -29,28 +29,28 @@ reviews the dry-run, and sends. It never auto-fires and never auto-publishes.
 
 ## Components (installed at `~/.claude/skills/gist/`)
 
-- Gist client: `publish-core/gist_client.py` — fetch public raw URL → backstop → dry-run by default
-- Redactor:    `publish-core/redactor.py` — backstop; built-in universal patterns + your denylist
-- Cap ledger:  `publish-core/cap_ledger.py` — surface `gist` (cap from `$GIST_DAILY_CAP`, default 2); enforced + incremented automatically in the live `--send` path
+- Gist client: `publish-core/gist_client.py`, fetch public raw URL → backstop → dry-run by default
+- Redactor:    `publish-core/redactor.py`, backstop; built-in universal patterns + your denylist
+- Cap ledger:  `publish-core/cap_ledger.py`, surface `gist` (cap from `$GIST_DAILY_CAP`, default 2); enforced + incremented automatically in the live `--send` path
 - Arm flags:   `~/.claude/state/publishers-armed` AND `~/.claude/state/gist-publishers-armed` (a live gist needs BOTH; either absent = DISARMED)
-- Self-test:   `publish-core/selftest.py` — proves the guards before you trust them
+- Self-test:   `publish-core/selftest.py`, proves the guards before you trust them
 
 ## Auth
 
 The live create shells `gh gist create --public`, using your existing `gh` token
 (it needs the **`gist`** scope: `gh auth refresh -s gist`). No secret is read or
-printed by this skill — `gh` handles auth. With no `gh` / no scope, the live
+printed by this skill, `gh` handles auth. With no `gh` / no scope, the live
 create fails; the dry-run still works (it never calls `gh`).
 
 ## Source repo
 
 Pass `--repo OWNER/REPO` (or set `$GIST_SOURCE_REPO`); ref defaults to `main`
-(or `$GIST_SOURCE_REF`). **It must be a PUBLIC repo** — the unauthenticated raw
+(or `$GIST_SOURCE_REF`). **It must be a PUBLIC repo**: the unauthenticated raw
 fetch is what proves the content is already world-readable.
 
 ## Procedure (run in order; stop at the first gate that blocks)
 
-1. **Pick the already-public source** — one or more repo-relative paths and a
+1. **Pick the already-public source**: one or more repo-relative paths and a
    short description. List valid paths with:
    ```bash
    gh api repos/OWNER/REPO/git/trees/main?recursive=1 --jq '.tree[].path'
@@ -67,8 +67,8 @@ fetch is what proves the content is already world-readable.
      proved world-readability, a hit is a **false positive** (e.g. a public doc
      that shows a token PREFIX in an example).
 
-3. **Review hits, then ack if benign.** Eyeball each printed hit. If — and only
-   if — each is a benign already-public token, re-run with `--ack-public-hits`.
+3. **Review hits, then ack if benign.** Eyeball each printed hit. If, and only
+   if, each is a benign already-public token, re-run with `--ack-public-hits`.
    **Never ack a hit you have not read.** A hit that looks like a real secret
    means a leak is already live in the public repo and must be fixed there first.
 
@@ -80,8 +80,8 @@ fetch is what proves the content is already world-readable.
    ```
 
 5. **Arm check + create.** A gist is a CODE surface, so it needs BOTH flags.
-   - **DISARMED (default)** — the dry-run is the deliverable; report it and stop.
-   - **ARMED** (`touch` BOTH flags) — create live. The dry-run prints a `sha256=`
+   - **DISARMED (default)**: the dry-run is the deliverable; report it and stop.
+   - **ARMED** (`touch` BOTH flags), create live. The dry-run prints a `sha256=`
      per file; pass it back via `--expect-sha256 <name>=<hex>` so the send is
      bound to the exact bytes you reviewed (the default `main` ref can move
      between the dry-run and the send):
@@ -121,12 +121,12 @@ python3 ~/.claude/skills/gist/publish-core/gist_client.py create \
 ## Hard rails
 
 - **Only ever publish content fetched from a PUBLIC repo over the unauthenticated
-  raw URL.** Never feed local files to the gist client — the raw-fetch proof is
+  raw URL.** Never feed local files to the gist client, the raw-fetch proof is
   the actual guard for this code surface.
 - Human-gated: never auto-fire, never auto-send. A human reviews the dry-run.
 - Never `--ack-public-hits` a redactor hit you have not eyeballed and confirmed is
   a benign already-public token.
 - DISARMED → no create, ever. A live gist needs BOTH the shared flag and the
   gist-specific flag, so arming a prose publisher (e.g. /x) never silently arms
-  the gist code surface — see `references/DERIVE-FROM-PUBLIC.md`.
-- Never print a token/secret value (the client and `gh` both avoid this — keep it).
+  the gist code surface, see `references/DERIVE-FROM-PUBLIC.md`.
+- Never print a token/secret value (the client and `gh` both avoid this, keep it).

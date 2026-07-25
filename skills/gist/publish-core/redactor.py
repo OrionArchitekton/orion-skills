@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""publish-core redactor — the ONLY guard for public output.
+"""publish-core redactor, the ONLY guard for public output.
 
 A public surface (X, a blog, a gist) often has NO platform-side secret/PII
 scanner. So private material must be caught HERE before it ships. Policy: a
 denylist of private tokens + ABSTAIN-if-uncertain (fail-closed). If a candidate
 carries any denylisted proper noun, host, identity, or secret-shaped token, the
-verdict is ABSTAIN: do NOT publish — surface to a human to genericize.
+verdict is ABSTAIN: do NOT publish, surface to a human to genericize.
 
 Two layers of patterns:
-  * BUILT-IN UNIVERSAL (below) — secret-shaped tokens, RFC-1918/CGNAT IPs,
+  * BUILT-IN UNIVERSAL (below), secret-shaped tokens, RFC-1918/CGNAT IPs,
     private-key headers, *.internal/.local hosts, /home//Users absolute paths.
     Useful for everyone, always on.
-  * YOUR CUSTOM DENYLIST (loaded from a file OUTSIDE this skill) — your org's
+  * YOUR CUSTOM DENYLIST (loaded from a file OUTSIDE this skill), your org's
     hostnames, repo/product names, client identities, internal email domains.
     Default: ~/.claude/config/x-denylist.txt (override with $X_DENYLIST_FILE).
     Keeping your private nouns in an external file means they survive skill
@@ -73,7 +73,7 @@ def _load_custom():
 
     Returns (patterns, errors) where errors is [(lineno, line, message)] for any
     line that is not a valid regex. A malformed line is SKIPPED so a single typo
-    cannot crash the guard mid-publish — but the skip must never be silent: a
+    cannot crash the guard mid-publish, but the skip must never be silent: a
     dropped denylist line is a HOLE in a fail-closed guard (the private noun it was
     meant to catch would publish). `--check` surfaces every error loudly.
     """
@@ -99,7 +99,7 @@ def active_patterns():
 
 
 def custom_load_errors():
-    """Malformed (skipped) custom-denylist lines — surfaced loudly by --check so a
+    """Malformed (skipped) custom-denylist lines, surfaced loudly by --check so a
     typo can't silently weaken a fail-closed guard."""
     return _load_custom()[1]
 
@@ -157,13 +157,13 @@ def main(argv) -> int:
         print("usage: redactor.py --check|--redact <file|->", file=sys.stderr)
         return 2
     if mode == "--check" and not CUSTOM_PATH.exists():
-        print(f"note: no custom denylist at {CUSTOM_PATH} — only built-in universal "
+        print(f"note: no custom denylist at {CUSTOM_PATH}, only built-in universal "
               "patterns are active (your hostnames/products/clients are NOT covered). "
               "Copy x-denylist.sample.txt there and edit it.", file=sys.stderr)
     if mode == "--check" and CUSTOM_PATH.exists():
         for lineno, bad, msg in custom_load_errors():
             print(f"WARNING: denylist {CUSTOM_PATH} line {lineno} is not a valid regex "
-                  f"and was SKIPPED — your guard has a hole here until you fix it: "
+                  f"and was SKIPPED, your guard has a hole here until you fix it: "
                   f"{bad!r} ({msg})", file=sys.stderr)
     text = _read_source(argv[1])
     if mode == "--redact":
@@ -173,7 +173,7 @@ def main(argv) -> int:
         verdict, hits = decision(text)
         print(f"VERDICT: {verdict}")
         if hits:
-            print(f"HITS ({len(hits)}) — genericize before publishing:")
+            print(f"HITS ({len(hits)}), genericize before publishing:")
             for cls, masked in hits:
                 print(f"  - [{cls}] {masked}")
         return 0 if verdict == "PUBLISH" else 3
