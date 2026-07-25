@@ -117,8 +117,8 @@ Decisions the user has ALREADY made (locked at a prior gate, in a handoff, or vi
   check is legitimate) but does **not** re-present the decision to the user as a question.
 
 Confirm-against-live (silent evidence if it holds) and present-to-the-user (a choice) are **different
-operations.** Conflating them, routing a locked value through `premises[]` or grading it "confirm
-each locked row with a verdict" in the terminal condition, is what re-asks an already-made decision
+operations.** Conflating them (routing a locked value through `premises[]` or grading it "confirm
+each locked row with a verdict" in the terminal condition) is what re-asks an already-made decision
 every session (the cross-session re-gate bug). The ONE thing that re-opens a settled decision is live
 state CONTRADICTING it: that surfaces as a BLOCKING finding with evidence, never a silent default
 re-ask. **Absent/unverifiable ≠ contradicted** (the "COULD-NOT-VERIFY ≠ absent" probe rule above

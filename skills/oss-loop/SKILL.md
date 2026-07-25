@@ -38,10 +38,12 @@ either way.
    where the repo/registry homes are); for a new version, run the recon DELTA against
    the last release. Refuse if preconditions fail.
 1. **PROMPT**: build the research(+implement) prompt: recon-grounded, with a
-   transcript-checkable terminal condition (`goal-prompt`). Never fire it from here, the approval gate is a separate human fire.
+   transcript-checkable terminal condition (`goal-prompt`). Never fire it from here, the
+   approval gate is a separate human fire.
 2. **RESEARCH**: the human fires the research/loop run → a reviewed plan (a "MAP").
    If a research pass returns "all refuted / inconclusive", check for an **abstention**
-   (a verifier that crashed / rate-limited and returned no votes) before trusting it, a crashed verifier is not a refutation.
+   (a verifier that crashed / rate-limited and returned no votes) before trusting it, a crashed
+   verifier is not a refutation.
 3. **GATE (human)**: the human approves/edits the plan's DO set.
 4. **IMPLEMENT**: drive the change to a CI-green PR through a self-correcting
    RED→GREEN loop with a BLOCKING adversarial + security review (`tdd-loop`). The agent

@@ -34,7 +34,8 @@ source code, pair it with an entropy/allowlist scanner and keep code human-gated
 
 A shell hook can't run a skill or post anything; it can only emit
 `additionalContext` to NUDGE the in-session model to consider publishing. So
-"autonomous" means *no per-post human approval gate while a session is running*, not a daemon posting while you're away. The model still executes in-session on the
+"autonomous" means *no per-post human approval gate while a session is running*, not a daemon
+posting while you're away. The model still executes in-session on the
 nudge, through the same redactor + cap + arm gates. See `HOOK-PATTERN.md`.
 
 ## 5. Caps are host-global

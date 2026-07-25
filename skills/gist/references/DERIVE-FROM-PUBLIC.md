@@ -3,14 +3,15 @@
 `/gist` is the concrete implementation of the doctrine rule **"Gate by artifact
 type"** (restated below; if you also installed the sibling `/x` skill, see the
 "Gate by artifact type" section of its `references/DOCTRINE.md`): short prose can
-auto-publish behind a redactor + cap, but **code/config is a higher-risk surface**: embedded secrets, real paths, env-var names that map your infra, structural
-identifiers, so keep it human-gated and, ideally, publish only material that is
+auto-publish behind a redactor + cap, but **code/config is a higher-risk surface**
+(embedded secrets, real paths, env-var names that map your infra, structural
+identifiers), so keep it human-gated and, ideally, publish only material that is
 *already* public. This doc is *how* you make "already public" enforceable instead
 of a hope.
 
 ## The structural guard: the unauthenticated raw fetch
 
-A denylist cannot prove a file is safe to publish, it can only flag the private
+A denylist cannot prove a file is safe to publish; it can only flag the private
 nouns you remembered to enumerate. For real source that is the wrong tool. So
 `/gist` does not try to *clean* code; it refuses to publish anything that is not
 **already world-readable**, and it *proves* that mechanically:
@@ -19,7 +20,7 @@ nouns you remembered to enumerate. For real source that is the wrong tool. So
 > with **no authentication**. If that request returns 200, the content is, by
 > definition, already readable by anyone on the internet. Re-publishing it as a
 > public gist discloses nothing new. A 404 means the path/ref is wrong **or the
-> repo is not public**, either way, the publish is refused.
+> repo is not public**. Either way, the publish is refused.
 
 The fetch *is* the guard. It cannot be satisfied by private content, so there is
 no path by which estate/internal code reaches a gist.
@@ -35,7 +36,7 @@ reason to block already-public content.
 
 So the backstop is **fail-closed by default but human-overridable**:
 
-- Default: any hit → **ABSTAIN**, the create is refused, the hits are printed.
+- Default: any hit → **ABSTAIN**: the create is refused and the hits are printed.
 - A human who has **eyeballed each hit** and confirmed it is a benign
   already-public token re-runs with `--ack-public-hits`, an explicit, logged
   decision, well-founded because the raw fetch already proved world-readability.
@@ -53,7 +54,8 @@ middle path: fail-closed, with an explicit human gate.
 Like every publisher in this library, `/gist` ships **DISARMED**: the dry-run
 constructs and inspects the gist plan without ever creating anything.
 
-Because a gist is a **code** surface, strictly higher-risk than a prose poster, `/gist` requires **two** arm flags by default, not one: the shared
+Because a gist is a **code** surface, strictly higher-risk than a prose poster, `/gist`
+requires **two** arm flags by default, not one: the shared
 `~/.claude/state/publishers-armed` **and** the gist-specific
 `~/.claude/state/gist-publishers-armed`. A live create needs `--send` plus
 **both** flags (`is_gist_armed()`). This is the point: a new, higher-risk surface
@@ -61,7 +63,8 @@ must not inherit "armed" from a flag you set for a lower-risk prose surface (e.g
 `/x`) before the code surface existed. Arming `/x` never silently arms `/gist`;
 removing the shared flag still disarms everything. The dual-flag requirement lives
 in `common.py` (`is_gist_armed()`), and the live `--send` path also enforces the
-daily cap (`cap_ledger`) before creating and increments it on success, the cap is
+daily cap (`cap_ledger`) by RESERVING the slot before the irreversible create, and
+keeping it consumed even if the create fails (fail safe by over-counting); the cap is
 not a separate manual step you can forget.
 
 ## Why human-gated (`disable-model-invocation: true`)

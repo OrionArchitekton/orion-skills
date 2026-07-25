@@ -48,7 +48,7 @@ are active, and `redactor.py --check` prints a warning saying so.
 ## Policy: abstain if uncertain (fail-closed)
 
 `decision(text)` returns `ABSTAIN` if **any** pattern (built-in or custom)
-matches, and you must not publish past an ABSTAIN, genericize and re-check, or
+matches, and you must not publish past an ABSTAIN. Genericize and re-check, or
 stop. The point is to *refuse and surface*, not to auto-strip and post (which can
 leave a partial leak). Abstaining on a borderline candidate is the correct, safe
 outcome.
@@ -58,7 +58,7 @@ outcome.
 ```bash
 python3 publish-core/selftest.py     # built-ins + the custom loader + cap, all green
 ```
-The self-test is stable regardless of your customization, it proves the built-in
+The self-test is stable regardless of your customization: it proves the built-in
 universals and that a custom file is loaded and applied (via a temp file), so you
 don't have to keep test fixtures in sync with your real denylist.
 

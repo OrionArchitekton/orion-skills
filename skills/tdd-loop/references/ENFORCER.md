@@ -52,14 +52,14 @@ Dispatch the same computed diff to each role; collect findings; severity-grade.
   abuse / composition / cascade failures.
 
 If you have no reviewer agents, run each role's checklist against the diff yourself in a
-dedicated pass, the gate is that the *computed diff* was actually reviewed.
+dedicated pass; the gate is that the *computed diff* was actually reviewed.
 
 Dispatch prompt skeleton (each reviewer):
 
 ```text
 Review ONLY this diff (attached). Return findings, each with a severity
 (BLOCKING|WARNING|INFO) and concrete evidence (file:line + the failing scenario).
-Do not review unchanged code. If the diff is empty, say so, do not return "clean".
+Do not review unchanged code. If the diff is empty, say so; do not return "clean".
 <diff or changed-file list here>
 ```
 

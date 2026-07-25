@@ -66,7 +66,7 @@ tags: [...]
 <what now stops recurrence: test, check, runbook, doctrine, link it>
 ```
 
-`symptoms:` is the retrieval key, write it as the next agent would grep it
+`symptoms:` is the retrieval key: write it as the next agent would grep it
 (error strings, observable states), not as you'd describe it in hindsight.
 
 ### 3. Decide: runbook too?

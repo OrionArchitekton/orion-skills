@@ -14,7 +14,7 @@ looping until BOTH the full test suite AND the security checklist are green, eac
 proven by a captured artifact, never by self-report.
 
 The skill's contribution is the **enforcer + iteration controller**. It is
-self-contained, it composes nothing you must install. (Optional: if you run a skill
+self-contained; it composes nothing you must install. (Optional: if you run a skill
 ecosystem with dedicated TDD / planning / review skills, slot them into the matching
 stages below; the gates are identical either way.)
 
@@ -28,7 +28,8 @@ A self-policed gate can be rationalized past, so bind every gate to an artifact 
 re-read. "I checked and it's fine" is not a green verdict.
 
 **Violating the letter of the gates is violating the spirit of the gates.** A green
-deploy, green CI, a stale LGTM, "I'm confident", necessary at most, never sufficient.
+deploy, green CI, a stale LGTM, "I'm confident": each is necessary at most, never
+sufficient.
 
 ## When to use
 
@@ -96,7 +97,7 @@ the PR does not open while any BLOCKING finding is open OR the suite is red.**
   investigation, not a forward patch.
 - **Review-ran gate**: COMPUTE the diff yourself (`git diff <base>...HEAD`), assert it
   is NON-EMPTY and matches the slices touched, and feed THAT diff to the reviewers. An
-  empty/clean reviewer result on a non-empty diff is a GATE FAILURE (re-run), "the
+  empty/clean reviewer result on a non-empty diff is a GATE FAILURE (re-run): "the
   engine actually ran against the actual diff" is a precondition of any green verdict.
 - **Security gate (BLOCKING-as-hard-gate)**: run the diff through the security
   checklist below; any BLOCKING finding blocks the PR. Loop-until clean.
@@ -172,16 +173,18 @@ Dispatch the computed diff to (at least) two roles:
   propagation, abuse / composition / cascade failures).
 
 Use whatever diff-fed reviewer agents your harness provides. If you have none, run each
-role's checklist against the diff YOURSELF in a dedicated pass, the gate is that a
+role's checklist against the diff YOURSELF in a dedicated pass; the gate is that a
 reviewer (human, agent, or your own structured pass) actually saw the *computed* diff.
 A PR-scoped or "looks simple, skipping" review is NOT the pre-PR security engine: run
 security review on every diff, then any broader post-PR review as a complement.
 
 ## Substrate (harness-agnostic)
 
-Drive the per-slice and per-review fan-out with whatever your harness gives you, independent subagents, a deterministic workflow runner if you have one, or inline
+Drive the per-slice and per-review fan-out with whatever your harness gives you, independent
+subagents, a deterministic workflow runner if you have one, or inline
 sequential work. Never assume a particular orchestrator is available; an un-orchestrated
-run MUST still complete end-to-end inline. The gates above are substrate-independent, they bind to artifacts either way.
+run MUST still complete end-to-end inline. The gates above are substrate-independent, they bind
+to artifacts either way.
 
 ## Rails (baked in)
 

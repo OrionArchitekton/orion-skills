@@ -129,4 +129,4 @@ python3 ~/.claude/skills/gist/publish-core/gist_client.py create \
 - DISARMED → no create, ever. A live gist needs BOTH the shared flag and the
   gist-specific flag, so arming a prose publisher (e.g. /x) never silently arms
   the gist code surface, see `references/DERIVE-FROM-PUBLIC.md`.
-- Never print a token/secret value (the client and `gh` both avoid this, keep it).
+- Never print a token/secret value (the client and `gh` both avoid this; keep it).

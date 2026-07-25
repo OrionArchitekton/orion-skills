@@ -11,7 +11,8 @@ the `pretooluse-readonly` PreToolUse hook DENY every file-mutating tool
 (Edit/Write/MultiEdit/NotebookEdit) for the rest of the session, until cleared.
 
 It is the sister of `scope-guard`: scope-guard constrains *where* you may write;
-read-only mode constrains *whether* you may write at all. Same proven mechanism, an opt-in, fail-open session marker + a PreToolUse `permissionDecision: deny`.
+read-only mode constrains *whether* you may write at all. Same proven mechanism, an opt-in,
+fail-open session marker + a PreToolUse `permissionDecision: deny`.
 
 ## When to use
 
@@ -42,7 +43,7 @@ again). No marker = no enforcement (safe default).
 
 ## Discipline
 
-- Set BEFORE the read-only work; clear AFTER, prefer clearing in the same turn
+- Set BEFORE the read-only work; clear AFTER; prefer clearing in the same turn
   (or a trap) so a crash doesn't strand the session, and others, read-only. The
   marker is a file on disk: a stranded `active` marker blocks writes in the NEXT
   session too until someone runs `off`.

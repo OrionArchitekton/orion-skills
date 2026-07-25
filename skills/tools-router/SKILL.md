@@ -37,7 +37,7 @@ read-only identity command and each MCP's health, then render. Four disciplines,
 
 **Plane 2, fail-open injector** (session start). Read the PRE-RENDERED compact table and inject
 it; do zero probing and zero subprocess spawning. If the table is missing or malformed, inject
-nothing and exit success, a session must never block on the index. Prepend a one-line banner when
+nothing and exit success; a session must never block on the index. Prepend a one-line banner when
 there are flags or the table is stale (older than your recon interval × a few), so a missed recon
 surfaces instead of silently serving stale auth.
 
@@ -96,7 +96,7 @@ fail-open session-start injector. Both are illustrative skeletons to adapt, not 
 | Persisting raw probe stdout into the index | Capture enum + non-secret identity; redact; test that no secret renders. |
 | One auth rule (usually `exit==0`) for all tools | Per-tool affirmative predicate over exit + content; handle env-var and config-present. |
 | Probing at session start | Probe in the periodic recon only; the injector reads a cached table, fail-open. |
-| Auto-disabling a "redundant" provider | Recommend-only, human-gated, removal is irreversible-ish config surgery. |
+| Auto-disabling a "redundant" provider | Recommend-only, human-gated; removal is irreversible-ish config surgery. |
 
 ## Boundary
 

@@ -34,7 +34,7 @@ Check that the current branch is NOT the base branch or any protected branch dec
 
 Check for and execute repo-local preflight in this order:
 
-1. `.claude/hooks/pre-commit.sh`, if present and executable, run it
+1. `.claude/hooks/pre-commit.sh`: if present and executable, run it
 2. Repo-declared CI contract commands from `CLAUDE.md` or `AGENTS.md` (e.g., `pytest`, `npm test`, `bun test`)
 
 If no repo-local preflight exists, report as INFO: "No repo-local preflight found."
@@ -50,7 +50,7 @@ git diff <base-branch>...HEAD
 Patterns to check (advisory, not a policy gate):
 - `password`, `secret`, `token`, `api_key`, `apikey`, `private_key`, `auth_token` followed by assignment with a string value
 - Base64-encoded strings longer than 40 characters that look like keys
-- Your secrets manager's documented token prefixes (most managers publish a recognizable prefix for service/personal tokens, add yours here)
+- Your secrets manager's documented token prefixes (most managers publish a recognizable prefix for service/personal tokens; add yours here)
 
 If hits are found, report as BLOCKING (secrets are the one advisory pattern that blocks).
 

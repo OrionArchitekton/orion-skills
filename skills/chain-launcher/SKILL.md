@@ -36,7 +36,7 @@ it. Convenience over re-typing.
 3. **Bind to the plan you just approved, never guess on ambiguity.** If more than one
    launcher matches the stem, do NOT print one: list the candidates and **stop for the
    human to pick the one tied to the approved plan** (matched by the plan's id / date /
-   sha). Do *not* auto-select "the newest", that is not a binding to the approval and
+   sha). Do *not* auto-select "the newest"; that is not a binding to the approval and
    can surface a stale or sibling launcher, exactly the failure this gate exists to
    prevent.
 4. The human reviews and fires it (editing the DO set inline first if the approval

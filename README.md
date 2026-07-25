@@ -17,7 +17,7 @@ procedures out of the base prompt and pull them in only when the task matches.
 
 ## Install
 
-Claude Code auto-loads skills from `~/.claude/skills/` (v2.1.157+), **no marketplace or
+Claude Code auto-loads skills from `~/.claude/skills/` (v2.1.157+); **no marketplace or
 plugin required.** Copy any skill directory you want:
 
 ```bash

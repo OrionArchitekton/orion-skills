@@ -29,17 +29,21 @@ Status: SAVED <date>, awaiting the go to fire. <READ-ONLY | worktree+CI>.
 ## Operating doctrine (non-negotiable)
 - Investigate the codebase directly. Do NOT ask the user for context findable via filesystem, git,
   memory, or other tools. "Ask the user" is a last resort.
-- Load the recon seed <path>.recon.json FIRST and VERIFY it against live state, it is a SEED,
+- Load the recon seed <path>.recon.json FIRST and VERIFY it against live state; it is a SEED,
   not authority; may be stale by fire time. Do not trust blindly.
 - Verify every premise against live state before accepting it.
 - **Settled decisions** (the SETTLED DECISIONS block / recon `settled_decisions[]`) are ASSERTED, not
-  re-opened. Confirm each against live state as EVIDENCE, a namespace, identity, or version CAN drift, but do NOT re-present a settled decision to the user as a choice. Re-gate ONLY genuinely-open items. A
+  re-opened. Confirm each against live state as EVIDENCE (a namespace, identity, or version CAN
+  drift), but do NOT re-present a settled decision to the user as a choice. Re-gate ONLY
+  genuinely-open items. A
   settled decision that live state AFFIRMATIVELY CONTRADICTS is a BLOCKING finding: surface it with
   evidence (the one thing that re-opens it), never a silent default re-ask. An ABSENT/unverifiable probe
   (e.g. a repo/org not created YET, expected in a research-before-build arc) is NOT a contradiction:
   leave it asserted, marked `unverifiable-pending`.
-- For any external-state premise inherited from the prompt builder, installed plugins, git roots,
-  materialized deploy paths, CLI/API shape, hook payload shape, remote monitor state, systemd state, run the preflight probes from `references/recon.md` and record claim-vs-actual deltas before
+- For any external-state premise inherited from the prompt builder (installed plugins, git
+  roots, materialized deploy paths, CLI/API shape, hook payload shape, remote monitor state,
+  systemd state), run the preflight probes from `references/recon.md` and record
+  claim-vs-actual deltas before
   acting on the premise.
 - Severity-grade all findings: BLOCKING / WARNING / INFO.
 - Adversarially red-team your own conclusions before presenting (spawn a skeptic per headline claim).
@@ -134,7 +138,7 @@ const pending = judged.filter(j => j.state === 'pending')
   Deliverable = the MAP at `<prompts-dir>/<topic>-MAP-<date>.md` + the staged STEP 2 prompt.
 - STEP 2 (implement): opens with **PRECONDITION: STEP 1 produced the MAP AND the user approved it**
   (assert the approved MAP's path + SHA/date; skip rows the user dropped). Phases = steps → verify-live
-  → deliver. **Derive the implement rails from the TARGET's own contract, do not hardcode a
+  → deliver. **Derive the implement rails from the TARGET's own contract; do not hardcode a
   repo/PR flow:**
   - *git repo (code):* fresh worktree from main (never canonical home; never force-push), brand git
     identity if applicable, CI gates must pass, independent runtime verification before "done".
