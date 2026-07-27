@@ -1,6 +1,9 @@
 # orion-skills
 
-A small, curated library of original [Claude Code](https://docs.claude.com/en/docs/claude-code) skills for disciplined agent workflows.
+A small, curated library of original Agent Skills for disciplined coding-agent
+workflows. The full library targets
+[Claude Code](https://docs.claude.com/en/docs/claude-code); a narrowly validated
+starter set also supports [Codex CLI](https://developers.openai.com/codex/skills).
 
 These are workflow- and finish-discipline skills, not tool wrappers. They encode the
 boring, high-leverage habits that keep an autonomous coding agent honest: don't claim
@@ -12,10 +15,13 @@ autonomous prompt.
 
 A [skill](https://www.agentskills.io) is a folder with a `SKILL.md` file: YAML
 frontmatter (`name`, `description`) plus a Markdown body the agent loads on demand.
-Claude Code auto-loads any skill under `~/.claude/skills/`. Skills keep specialized
-procedures out of the base prompt and pull them in only when the task matches.
+Claude Code and Codex load skills from their supported local skill directories.
+Skills keep specialized procedures out of the base prompt and pull them in only
+when the task matches.
 
 ## Install
+
+### Claude Code
 
 Claude Code auto-loads skills from `~/.claude/skills/` (v2.1.157+); **no marketplace or
 plugin required.** Copy any skill directory you want:
@@ -32,6 +38,68 @@ Then invoke a skill by name in Claude Code (e.g. `/ship`, `/pre-pr`), or let the
 auto-invoke it when the `description` matches the task. Skills that should only be
 operator-invoked (never model-auto-invoked) carry `disable-model-invocation: true` in
 their frontmatter.
+
+### Codex CLI
+
+The verified Codex starter set contains exactly these three portable
+verification disciplines:
+
+- [`reprobe-stale-premise`](skills/reprobe-stale-premise/SKILL.md)
+- [`prove-control-binds`](skills/prove-control-binds/SKILL.md)
+- [`prove-deploy-is-live`](skills/prove-deploy-is-live/SKILL.md)
+
+In Codex, run each installer request as a separate prompt. If one skill already
+exists, inspect or update that installation deliberately, then continue with
+the other prompts; one existing destination cannot prevent the other skills
+from being installed.
+
+```text
+$skill-installer Install https://github.com/OrionArchitekton/orion-skills/tree/main/skills/reprobe-stale-premise
+```
+
+```text
+$skill-installer Install https://github.com/OrionArchitekton/orion-skills/tree/main/skills/prove-control-binds
+```
+
+```text
+$skill-installer Install https://github.com/OrionArchitekton/orion-skills/tree/main/skills/prove-deploy-is-live
+```
+
+Or, from the root of a clone, copy missing skills to Codex's user skill
+location. This fallback preserves an existing destination instead of
+overwriting it:
+
+```bash
+(
+  set -eu
+  mkdir -p "$HOME/.agents/skills"
+  for skill in reprobe-stale-premise prove-control-binds prove-deploy-is-live; do
+    destination="$HOME/.agents/skills/$skill"
+    if [ -e "$destination" ] || [ -L "$destination" ]; then
+      printf 'preserving existing skill: %s\n' "$skill"
+      continue
+    fi
+    cp -r "skills/$skill" "$destination"
+  done
+  for skill in reprobe-stale-premise prove-control-binds prove-deploy-is-live; do
+    if [ ! -f "$HOME/.agents/skills/$skill/SKILL.md" ]; then
+      printf 'incomplete skill installation: %s\n' "$skill" >&2
+      exit 1
+    fi
+  done
+)
+```
+
+The skills become available on the next turn; restart Codex if a new skill does
+not appear. Invoke one explicitly as `$reprobe-stale-premise`,
+`$prove-control-binds`, or `$prove-deploy-is-live`, or let its description match
+the task.
+
+This is direct local skill installation, not a plugin-directory listing. It
+requires no plugin marketplace. The skills use whatever Git, GitHub, runtime,
+network, and approval capabilities the active Codex host provides; they do not
+provision credentials or connectors. The wider library has not yet been
+validated as a Codex set.
 
 ## Skills
 
