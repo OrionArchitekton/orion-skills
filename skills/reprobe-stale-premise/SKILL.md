@@ -1,6 +1,6 @@
 ---
 name: reprobe-stale-premise
-description: Use when about to act on a claim you did not just verify, a handoff/pre-compact "next task"/"still broken", a teammate's diagnosis, "tool X doesn't exist", "X is live/dead", "consume shipped tool Y", a "UNBUILT" registry state, or whether remote/PR work landed. Especially on a shared multi-session box. Symptom: starting the implied work before re-probing the premise.
+description: "Use when about to act on a claim you did not just verify, a handoff/pre-compact \"next task\"/\"still broken\", a teammate's diagnosis, \"tool X doesn't exist\", \"X is live/dead\", \"consume shipped tool Y\", a \"UNBUILT\" registry state, or whether remote/PR work landed. Especially on a shared multi-session box. Symptom: starting the implied work before re-probing the premise."
 ---
 
 # reprobe-stale-premise

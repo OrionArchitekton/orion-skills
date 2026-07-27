@@ -1,7 +1,9 @@
 # Contributing to orion-skills
 
-Thanks for your interest. This is a **curated, opinionated personal library** of Claude
-Code skills, not a community catalog, so the contribution model is intentionally narrow.
+Thanks for your interest. This is a **curated, opinionated personal library** of Agent
+Skills, not a community catalog, so the contribution model is intentionally narrow. The
+full catalog primarily targets Claude Code; portability to Codex and other agent runtimes
+is added only when it is explicitly validated.
 
 ## What's welcome
 
@@ -30,6 +32,15 @@ Open an issue first. For a small fix, a PR referencing that issue is fine.
 - **Match the house style.** kebab-case skill directories; a sharp, trigger-oriented
   `description`; second-person, actionable prose.
 - Keep commits focused and explain the *why* in the message.
+
+## Validation
+
+Install the test-only dependency and run the repository contract suite:
+
+```bash
+python -m pip install -r requirements-test.txt
+python -m pytest
+```
 
 ## Code of Conduct
 

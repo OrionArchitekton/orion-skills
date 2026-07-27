@@ -4,6 +4,17 @@ All notable changes to the orion-skills library. This project follows Semantic
 Versioning (https://semver.org): adding a skill is a MINOR bump, a non-breaking change to
 an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
 
+## [Unreleased]
+
+### Changed
+
+- Added a verified Codex CLI starter set for `reprobe-stale-premise`,
+  `prove-control-binds`, and `prove-deploy-is-live`, with independent
+  `$skill-installer` requests, non-overwriting manual local-install guidance,
+  and a compatibility contract in CI.
+- Quoted `reprobe-stale-premise` frontmatter so it is valid YAML and passes the
+  OpenAI skill validator.
+
 ## [0.5.1] - 2026-07-24
 
 ### Changed

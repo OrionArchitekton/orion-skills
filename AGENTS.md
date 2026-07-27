@@ -24,6 +24,7 @@ PRs, capturing learnings, and writing executable plans.
 ## Validation
 
 ```bash
+python -m pip install -r requirements-test.txt
 python -m pytest
 ```
 
