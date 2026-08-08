@@ -122,11 +122,39 @@ def cases():
     if os.geteuid() != 0:  # root ignores the permission bit, so the case proves nothing
         yield ("unreadable-but-present marker denies", BLOCK, _unreadable)
 
+    def _unsearchable_parent(d):
+        # "Not found" and "cannot look" are different answers that `test -e`
+        # collapses into one. With the parent dir unsearchable, an ARMED marker
+        # inside it is invisible, so treating that as absent would disarm the
+        # gate exactly when the filesystem is in a strange state.
+        parent = os.path.join(d, "state")
+        os.mkdir(parent)
+        p = os.path.join(parent, "readonly.json")
+        with open(p, "w") as fh:
+            fh.write('{"active": true}')
+        os.chmod(parent, 0)
+        return p
+    if os.geteuid() != 0:
+        yield ("marker hidden by an unsearchable parent denies", BLOCK, _unsearchable_parent)
+
     # ---- Controls: these MUST allow, or the suite is just a blanket blocker ----
     def _absent(d):
         return os.path.join(d, "does-not-exist.json")
     yield ("CONTROL: no marker allows (gate is opt-in)", ALLOW, _absent)
     yield ("CONTROL: active:false allows (explicit clear)", ALLOW, write('{"active": false}'))
+
+
+def _cleanup(root: str) -> None:
+    # Two cases deliberately chmod things to 0, and rmtree cannot descend into a
+    # mode-0 directory. With ignore_errors it would fail silently and leak temp
+    # dirs, so restore permissions on the way out first.
+    for dirpath, dirnames, filenames in os.walk(root, topdown=True):
+        for name in dirnames + filenames:
+            try:
+                os.chmod(os.path.join(dirpath, name), stat.S_IRWXU)
+            except OSError:
+                pass
+    shutil.rmtree(root, ignore_errors=True)
 
 
 def run_all():
@@ -137,7 +165,11 @@ def run_all():
             marker = setup(d)
             actual, detail = fire(marker)
         finally:
-            shutil.rmtree(d, ignore_errors=True)
+            try:
+                os.chmod(d, stat.S_IRWXU)
+            except OSError:
+                pass
+            _cleanup(d)
         results.append((name, expected, actual, detail, expected == actual))
     return results
 

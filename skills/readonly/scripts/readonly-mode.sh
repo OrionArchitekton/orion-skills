@@ -77,13 +77,35 @@ case "$cmd" in
     fi
 
     # python for correct JSON escaping of an arbitrary reason string.
+    #
+    # Written to a temp file in the same directory and renamed into place, never
+    # opened directly with "w". A direct open truncates BEFORE the content is
+    # committed, so a failure partway (disk full, quota, interrupt) would leave a
+    # present-but-empty marker. That state is not harmless: the hook fails closed
+    # on it and blocks every write, while this script would be reporting "NOT
+    # armed". Rename is atomic on the same filesystem, so the marker is either
+    # the previous state or a complete new one, and never a torn one.
     if ! READONLY_REASON="$reason" python3 - "$MARKER" <<'PY'
 import json
 import os
 import sys
+import tempfile
 
-with open(sys.argv[1], "w") as fh:
-    json.dump({"active": True, "reason": os.environ.get("READONLY_REASON", "")}, fh)
+target = sys.argv[1]
+directory = os.path.dirname(target) or "."
+fd, tmp = tempfile.mkstemp(dir=directory, prefix=".readonly-", suffix=".tmp")
+try:
+    with os.fdopen(fd, "w") as fh:
+        json.dump({"active": True, "reason": os.environ.get("READONLY_REASON", "")}, fh)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, target)
+except Exception:
+    try:
+        os.unlink(tmp)
+    except OSError:
+        pass
+    raise
 PY
     then
       echo "readonly: FAILED to write $MARKER; read-only mode is NOT armed" >&2

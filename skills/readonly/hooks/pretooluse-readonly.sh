@@ -37,6 +37,16 @@ MARKER="${READONLY_MARKER:-$HOME/.claude/state/readonly.json}"
 # "absent" to -e while plainly being a marker someone put there. Treating it as
 # absent would let a broken marker silently disable the gate.
 if [ ! -e "$MARKER" ] && [ ! -L "$MARKER" ]; then
+  # "Not found" and "cannot look" are different answers, and the test above
+  # returns the same result for both. If the parent directory exists but is not
+  # searchable, an armed marker inside it is invisible to us, and exiting 0 here
+  # would silently disarm the gate. Only treat absence as real when we could
+  # actually have seen the file: the parent is searchable, or it does not exist
+  # (in which case no marker can exist either).
+  _dir=$(dirname "$MARKER")
+  if [ -d "$_dir" ] && [ ! -x "$_dir" ]; then
+    exit 2
+  fi
   exit 0
 fi
 
