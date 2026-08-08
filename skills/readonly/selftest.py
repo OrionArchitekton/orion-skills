@@ -137,6 +137,23 @@ def cases():
     if os.geteuid() != 0:
         yield ("marker hidden by an unsearchable parent denies", BLOCK, _unsearchable_parent)
 
+    def _unsearchable_ancestor(d):
+        # The immediate parent is fine; a GRANDparent is not. Checking only the
+        # immediate parent passes here by being equally blind: `-d` on the parent
+        # needs search permission on the grandparent, so it also fails, and the
+        # guard never fires. The hook walks up to the deepest directory it can
+        # actually stat instead.
+        top = os.path.join(d, "outer")
+        inner = os.path.join(top, "state")
+        os.makedirs(inner)
+        p = os.path.join(inner, "readonly.json")
+        with open(p, "w") as fh:
+            fh.write('{"active": true}')
+        os.chmod(top, 0)
+        return p
+    if os.geteuid() != 0:
+        yield ("marker hidden by an unsearchable ANCESTOR denies", BLOCK, _unsearchable_ancestor)
+
     # ---- Controls: these MUST allow, or the suite is just a blanket blocker ----
     def _absent(d):
         return os.path.join(d, "does-not-exist.json")

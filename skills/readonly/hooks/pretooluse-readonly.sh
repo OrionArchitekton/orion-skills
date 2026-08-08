@@ -38,15 +38,26 @@ MARKER="${READONLY_MARKER:-$HOME/.claude/state/readonly.json}"
 # absent would let a broken marker silently disable the gate.
 if [ ! -e "$MARKER" ] && [ ! -L "$MARKER" ]; then
   # "Not found" and "cannot look" are different answers, and the test above
-  # returns the same result for both. If the parent directory exists but is not
-  # searchable, an armed marker inside it is invisible to us, and exiting 0 here
-  # would silently disarm the gate. Only treat absence as real when we could
-  # actually have seen the file: the parent is searchable, or it does not exist
-  # (in which case no marker can exist either).
-  _dir=$(dirname "$MARKER")
-  if [ -d "$_dir" ] && [ ! -x "$_dir" ]; then
-    exit 2
-  fi
+  # returns the same result for both. If a directory on the path is not
+  # searchable, an armed marker beneath it is invisible to us, and exiting 0
+  # here would silently disarm the gate.
+  #
+  # Checking only the immediate parent is not enough: if an ANCESTOR is
+  # unsearchable then `-d` on the parent also fails (the stat needs search
+  # permission on ITS parent), so the check would pass by being equally blind.
+  # Walk up instead until we reach the deepest directory we can actually stat.
+  # Reaching a searchable one proves the path below it genuinely does not exist;
+  # reaching an unsearchable one proves only that we cannot see.
+  _probe=$(dirname "$MARKER")
+  while :; do
+    if [ -d "$_probe" ]; then
+      [ -x "$_probe" ] || exit 2
+      break
+    fi
+    _parent=$(dirname "$_probe")
+    [ "$_parent" = "$_probe" ] && break
+    _probe="$_parent"
+  done
   exit 0
 fi
 

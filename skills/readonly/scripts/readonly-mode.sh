@@ -38,32 +38,44 @@ need_python() {
   fi
 }
 
-# Report what the hook would do, from the marker itself.
+# Report what the hook would do, by ASKING THE HOOK.
+#
+# An earlier version re-derived this from the marker itself, and review found
+# three defects in the gap between the two implementations: with an inaccessible
+# parent directory the helper said OFF/ALLOW while the hook denied, and `off`
+# reported a clear that had not happened. Any second implementation of a gate's
+# logic drifts from it; the fix is to have exactly one, and query it.
+#
+# Interpreting the hook's PreToolUse contract:
+#   exit 0 + deny JSON -> ON (marker active)
+#   exit 2             -> ON via fail-closed (present but unevaluable, or unseeable)
+#   exit 0, no output  -> OFF (writes allowed)
+#
 #   0 = ON  (hook denies writes)
 #   1 = OFF (hook allows writes: absent, or explicit {"active": false})
-#   2 = ON via fail-closed (present but unevaluable, hook denies)
+#   2 = ON via fail-closed (hook denies without a marker it could read)
+HOOK="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks/pretooluse-readonly.sh"
+
 marker_state() {
-  if [ ! -e "$MARKER" ] && [ ! -L "$MARKER" ]; then
+  if [ ! -x "$HOOK" ] && [ ! -f "$HOOK" ]; then
+    echo "readonly: ERROR, cannot find the enforcement hook at $HOOK" >&2
+    return 3
+  fi
+  local out rc
+  out=$(printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"<status probe>"}}' \
+        | READONLY_MARKER="$MARKER" bash "$HOOK" 2>/dev/null)
+  rc=$?
+  if [ "$rc" -eq 2 ]; then
+    return 2
+  fi
+  if [ "$rc" -ne 0 ]; then
+    # Any other non-zero is fail-open at the harness, so the hook is NOT denying.
     return 1
   fi
-  python3 - "$MARKER" <<'PY'
-import json
-import sys
-
-try:
-    with open(sys.argv[1]) as fh:
-        marker = json.load(fh)
-except Exception:
-    sys.exit(2)
-if not isinstance(marker, dict):
-    sys.exit(2)
-active = marker.get("active")
-if active is True:
-    sys.exit(0)
-if active is False:
-    sys.exit(1)
-sys.exit(2)
-PY
+  case "$out" in
+    *'"permissionDecision"'*'"deny"'*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 case "$cmd" in
@@ -125,20 +137,32 @@ PY
 
   off)
     rm -f "$MARKER" 2>/dev/null
-    # Verify the post-condition. rm -f cannot remove a directory and exits 0 on a
-    # missing file, so its exit code alone proves nothing about what remains.
-    if [ -e "$MARKER" ] || [ -L "$MARKER" ]; then
-      echo "readonly: FAILED to clear $MARKER; it still exists, so the hook KEEPS BLOCKING writes" >&2
-      if [ -d "$MARKER" ]; then
-        echo "  it is a directory; remove it with: rmdir '$MARKER'  (or rm -r if it has contents)" >&2
-      fi
-      exit 1
-    fi
-    echo "readonly: OFF (marker cleared) -> $MARKER"
+    # Verify the post-condition against the hook, not against our own guess.
+    # `rm -f` exits 0 on a missing file and cannot unlink a directory, so its
+    # exit code proves nothing; and an `-e`/`-L` probe cannot see a marker whose
+    # directory is unsearchable, which is precisely the state the hook denies on.
+    # Asking the hook is the only check that cannot disagree with enforcement.
+    marker_state
+    case $? in
+      1) echo "readonly: OFF (marker cleared) -> $MARKER" ;;
+      0|2)
+        echo "readonly: FAILED to clear $MARKER; the hook STILL BLOCKS writes" >&2
+        if [ -d "$MARKER" ]; then
+          echo "  it is a directory; remove it with: rmdir '$MARKER'  (or rm -r if it has contents)" >&2
+        elif [ ! -e "$MARKER" ] && [ ! -L "$MARKER" ]; then
+          echo "  the marker is not visible from here, so a directory on its path is likely" >&2
+          echo "  unsearchable; fix permissions on $(dirname "$MARKER") and its ancestors, then retry" >&2
+        fi
+        exit 1 ;;
+      *) echo "readonly: could not determine state after clearing; assume writes are still blocked" >&2
+         exit 1 ;;
+    esac
     ;;
 
   status)
-    need_python
+    # Deliberately no python3 precondition here. If python3 is missing the hook
+    # itself denies (exit 2) whenever a marker is present, and reporting that
+    # honestly is more useful than refusing to answer.
     marker_state
     case $? in
       0) echo "readonly: ON -> $MARKER"
@@ -149,8 +173,12 @@ PY
            echo "readonly: OFF (no marker) -> $MARKER"
          fi
          echo "  the hook will ALLOW writes" ;;
-      *) echo "readonly: ON (fail-closed: marker present but not evaluable) -> $MARKER"
-         echo "  the hook will DENY writes until this marker is fixed or removed" ;;
+      2) echo "readonly: ON (fail-closed) -> $MARKER"
+         echo "  the hook will DENY writes: the marker is present but not evaluable,"
+         echo "  or a directory on its path is unsearchable so it cannot be read" ;;
+      *) echo "readonly: UNKNOWN, the enforcement hook could not be run" >&2
+         echo "  treat writes as unprotected until this is resolved" >&2
+         exit 1 ;;
     esac
     ;;
 

@@ -78,7 +78,10 @@ class OffReportsTruth(unittest.TestCase):
             os.mkdir(marker)
             proc = run_helper(["off"], marker)
             self.assertNotEqual(0, proc.returncode, "off must fail when the marker survives")
-            self.assertIn("KEEPS BLOCKING", proc.stdout + proc.stderr)
+            combined = proc.stdout + proc.stderr
+            self.assertIn("FAILED to clear", combined)
+            self.assertIn("STILL BLOCKS", combined)
+            self.assertNotIn("readonly: OFF", combined)
             self.assertTrue(os.path.exists(marker))
 
 
@@ -112,6 +115,88 @@ class StatusMatchesHookBehavior(unittest.TestCase):
             proc = run_helper(["status"], os.path.join(d, "nope.json"))
             self.assertIn("readonly: OFF", proc.stdout)
             self.assertIn("ALLOW", proc.stdout)
+
+
+class HelperAgreesWithHook(unittest.TestCase):
+    """The helper must never report a state the hook contradicts.
+
+    Three review findings lived in this gap: the helper re-derived the marker
+    state instead of asking the hook, so for an inaccessible parent it said
+    OFF/ALLOW while the hook denied, and `off` announced a clear that had not
+    happened. Any second implementation of a gate's logic drifts from it. The
+    helper now queries the hook, and this test pins that agreement so a future
+    edit cannot quietly reintroduce a private copy of the rules.
+    """
+
+    def _hook_blocks(self, marker):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("readonly_selftest", SELFTEST)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        verdict, _ = module.fire(marker)
+        return verdict == "BLOCK"
+
+    def _helper_says_blocked(self, marker):
+        proc = run_helper(["status"], marker)
+        combined = proc.stdout + proc.stderr
+        return "readonly: ON" in combined
+
+    def _check(self, make):
+        with tempfile.TemporaryDirectory() as d:
+            marker = make(d)
+            try:
+                self.assertEqual(
+                    self._hook_blocks(marker),
+                    self._helper_says_blocked(marker),
+                    "helper status disagrees with hook enforcement for %s" % marker,
+                )
+            finally:
+                for path in (os.path.dirname(marker), d):
+                    try:
+                        os.chmod(path, 0o700)
+                    except OSError:
+                        pass
+
+    def test_agree_on_active(self):
+        def make(d):
+            p = os.path.join(d, "readonly.json")
+            with open(p, "w") as fh:
+                fh.write('{"active": true}')
+            return p
+        self._check(make)
+
+    def test_agree_on_explicit_false(self):
+        def make(d):
+            p = os.path.join(d, "readonly.json")
+            with open(p, "w") as fh:
+                fh.write('{"active": false}')
+            return p
+        self._check(make)
+
+    def test_agree_on_malformed(self):
+        def make(d):
+            p = os.path.join(d, "readonly.json")
+            with open(p, "w") as fh:
+                fh.write("{not json")
+            return p
+        self._check(make)
+
+    def test_agree_on_absent(self):
+        self._check(lambda d: os.path.join(d, "nope.json"))
+
+    @unittest.skipIf(os.geteuid() == 0, "root ignores the search bit")
+    def test_agree_when_parent_is_unsearchable(self):
+        # The exact state the helper used to get wrong: invisible to a plain
+        # existence probe, denied by the hook.
+        def make(d):
+            parent = os.path.join(d, "state")
+            os.mkdir(parent)
+            p = os.path.join(parent, "readonly.json")
+            with open(p, "w") as fh:
+                fh.write('{"active": true}')
+            os.chmod(parent, 0)
+            return p
+        self._check(make)
 
 
 class SelftestCliPath(unittest.TestCase):
