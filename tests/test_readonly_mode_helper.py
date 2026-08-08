@@ -50,14 +50,18 @@ class OnReportsTruth(unittest.TestCase):
 
     def test_on_fails_loudly_when_the_marker_cannot_be_written(self):
         # The marker path is a directory, so the write cannot succeed. The helper
-        # must NOT claim the mode is armed.
+        # must NOT claim the mode is armed, and because the hook fail-closes on a
+        # directory marker it must report that file edits are being denied rather
+        # than claim the mode is off.
         with tempfile.TemporaryDirectory() as d:
             marker = os.path.join(d, "readonly.json")
             os.mkdir(marker)
             proc = run_helper(["on", "should fail"], marker)
             self.assertNotEqual(0, proc.returncode, "on must fail when it cannot write the marker")
             self.assertNotIn("readonly: ON (", proc.stdout)
-            self.assertIn("NOT armed", proc.stdout + proc.stderr)
+            combined = proc.stdout + proc.stderr
+            self.assertIn("DENYING file edits", combined)
+            self.assertNotIn("NOT armed", combined)
 
 
 class OffReportsTruth(unittest.TestCase):
