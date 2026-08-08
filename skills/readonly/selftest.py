@@ -104,6 +104,15 @@ def cases():
         return p
     yield ("marker that is a directory denies", BLOCK, _dir)
 
+    def _dangling_symlink(d):
+        # `test -e` follows symlinks, so a dangling link looks ABSENT to it while
+        # obviously being a marker someone placed. Treating it as absent would
+        # silently disable the gate, so the hook checks -L as well.
+        p = os.path.join(d, "readonly.json")
+        os.symlink(os.path.join(d, "no-such-target.json"), p)
+        return p
+    yield ("dangling symlink marker denies", BLOCK, _dangling_symlink)
+
     def _unreadable(d):
         p = os.path.join(d, "readonly.json")
         with open(p, "w") as fh:

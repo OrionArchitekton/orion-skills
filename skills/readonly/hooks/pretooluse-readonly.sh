@@ -30,9 +30,13 @@ set +e
 MARKER="${READONLY_MARKER:-$HOME/.claude/state/readonly.json}"
 
 # Opt-in gate: no marker at all means read-only mode is off. Stay inert and cheap.
+#
 # Note -e, not -r: an EXISTING but unreadable marker must reach the fail-closed
-# path below, not be mistaken for an absent one.
-if [ ! -e "$MARKER" ]; then
+# path below, not be mistaken for an absent one. The -L arm matters for the same
+# reason and is easy to miss: -e follows symlinks, so a DANGLING symlink is
+# "absent" to -e while plainly being a marker someone put there. Treating it as
+# absent would let a broken marker silently disable the gate.
+if [ ! -e "$MARKER" ] && [ ! -L "$MARKER" ]; then
   exit 0
 fi
 
@@ -43,7 +47,12 @@ trap 'rc=$?; [ "$rc" -eq 0 ] && exit 0; exit 2' EXIT
 
 command -v python3 >/dev/null 2>&1 || exit 2
 
-INPUT=$(cat 2>/dev/null)
+# Cap the event before it becomes an environment variable. The payload is used
+# ONLY to name the tool and path in the deny message, but an oversized env block
+# can make execve fail with E2BIG, and the fail-closed trap would then turn that
+# into a BLOCK even for a marker that says {"active": false}. Capping keeps the
+# decoration useful without letting payload size change the decision.
+INPUT=$(head -c 16384 2>/dev/null)
 
 READONLY_EVENT="$INPUT" python3 - "$MARKER" <<'PY'
 import json

@@ -4,7 +4,7 @@
 #
 # The hook is INERT until this marker exists, so this script is the caller half
 # of the rail. Do not hand-write the marker JSON; a malformed marker is treated
-# as "enforce" by the hook (fail-closed), which will block writes until cleared.
+# as "enforce" by the hook (fail-closed), which blocks writes until cleared.
 #
 # Usage:
 #   readonly-mode.sh on  [reason]   enter read-only mode (blocks ALL writes)
@@ -17,23 +17,67 @@
 # No secret ever passes through here: `reason` is a free-text label only.
 #
 # Override the marker path with READONLY_MARKER (the selftest uses this).
+#
+# DESIGN NOTE, and it is the whole point of this file:
+# every command must report the TRUE post-condition, never its intent. A helper
+# that prints "ON" when the marker was not written, or "OFF" when it was not
+# removed, is worse than no helper: the operator proceeds believing a control is
+# armed (or released) when it is not. So `on` re-reads the marker after writing,
+# `off` verifies the marker is gone, and `status` reports what the HOOK will
+# actually do rather than a guess.
 
 set -uo pipefail
 
 MARKER="${READONLY_MARKER:-$HOME/.claude/state/readonly.json}"
-mkdir -p "$(dirname "$MARKER")" 2>/dev/null
-
 cmd="${1:-status}"
+
+need_python() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "readonly: ERROR, python3 is required" >&2
+    exit 1
+  fi
+}
+
+# Report what the hook would do, from the marker itself.
+#   0 = ON  (hook denies writes)
+#   1 = OFF (hook allows writes: absent, or explicit {"active": false})
+#   2 = ON via fail-closed (present but unevaluable, hook denies)
+marker_state() {
+  if [ ! -e "$MARKER" ] && [ ! -L "$MARKER" ]; then
+    return 1
+  fi
+  python3 - "$MARKER" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1]) as fh:
+        marker = json.load(fh)
+except Exception:
+    sys.exit(2)
+if not isinstance(marker, dict):
+    sys.exit(2)
+active = marker.get("active")
+if active is True:
+    sys.exit(0)
+if active is False:
+    sys.exit(1)
+sys.exit(2)
+PY
+}
 
 case "$cmd" in
   on)
+    need_python
     reason="${2:-read-only audit/research mode}"
-    if ! command -v python3 >/dev/null 2>&1; then
-      echo "readonly: ERROR, python3 is required to write the marker safely" >&2
+
+    if ! mkdir -p "$(dirname "$MARKER")" 2>/dev/null; then
+      echo "readonly: FAILED to create $(dirname "$MARKER"); read-only mode is NOT armed" >&2
       exit 1
     fi
+
     # python for correct JSON escaping of an arbitrary reason string.
-    READONLY_REASON="$reason" python3 - "$MARKER" <<'PY'
+    if ! READONLY_REASON="$reason" python3 - "$MARKER" <<'PY'
 import json
 import os
 import sys
@@ -41,22 +85,53 @@ import sys
 with open(sys.argv[1], "w") as fh:
     json.dump({"active": True, "reason": os.environ.get("READONLY_REASON", "")}, fh)
 PY
-    echo "readonly: ON ($reason) -> $MARKER"
-    echo "  REMEMBER: run 'readonly-mode.sh off' when done; a stranded marker blocks all writes."
+    then
+      echo "readonly: FAILED to write $MARKER; read-only mode is NOT armed" >&2
+      exit 1
+    fi
+
+    # Re-read rather than trust the write. This is the difference between
+    # "I ran a command" and "the control is armed".
+    marker_state
+    case $? in
+      0) echo "readonly: ON ($reason) -> $MARKER"
+         echo "  REMEMBER: run 'readonly-mode.sh off' when done; a stranded marker blocks all writes." ;;
+      *) echo "readonly: FAILED, marker at $MARKER did not read back as active; read-only mode is NOT armed" >&2
+         exit 1 ;;
+    esac
     ;;
+
   off)
-    rm -f "$MARKER"
+    rm -f "$MARKER" 2>/dev/null
+    # Verify the post-condition. rm -f cannot remove a directory and exits 0 on a
+    # missing file, so its exit code alone proves nothing about what remains.
+    if [ -e "$MARKER" ] || [ -L "$MARKER" ]; then
+      echo "readonly: FAILED to clear $MARKER; it still exists, so the hook KEEPS BLOCKING writes" >&2
+      if [ -d "$MARKER" ]; then
+        echo "  it is a directory; remove it with: rmdir '$MARKER'  (or rm -r if it has contents)" >&2
+      fi
+      exit 1
+    fi
     echo "readonly: OFF (marker cleared) -> $MARKER"
     ;;
+
   status)
-    if [ ! -e "$MARKER" ]; then
-      echo "readonly: OFF (no marker) -> $MARKER"
-    elif python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d.get("active") is True else 1)' "$MARKER" 2>/dev/null; then
-      echo "readonly: ON -> $MARKER"
-    else
-      echo "readonly: ON (marker present but not parseable as inactive; the hook fails CLOSED and will block writes) -> $MARKER"
-    fi
+    need_python
+    marker_state
+    case $? in
+      0) echo "readonly: ON -> $MARKER"
+         echo "  the hook will DENY Edit/Write/MultiEdit/NotebookEdit" ;;
+      1) if [ -e "$MARKER" ] || [ -L "$MARKER" ]; then
+           echo "readonly: OFF (marker present with \"active\": false) -> $MARKER"
+         else
+           echo "readonly: OFF (no marker) -> $MARKER"
+         fi
+         echo "  the hook will ALLOW writes" ;;
+      *) echo "readonly: ON (fail-closed: marker present but not evaluable) -> $MARKER"
+         echo "  the hook will DENY writes until this marker is fixed or removed" ;;
+    esac
     ;;
+
   *)
     echo "usage: readonly-mode.sh {on [reason]|off|status}" >&2
     exit 2
