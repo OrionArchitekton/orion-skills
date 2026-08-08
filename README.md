@@ -105,7 +105,7 @@ validated as a Codex set.
 
 | Skill | What it does | Invoke when |
 |---|---|---|
-| [`readonly`](skills/readonly/SKILL.md) | Structural read-only session mode, sets a marker a PreToolUse hook reads to DENY every file-mutating tool until cleared. | An audit/research/census where nothing should change. |
+| [`readonly`](skills/readonly/SKILL.md) | Structural read-only session mode, sets a marker a PreToolUse hook reads to DENY the file-editing tools (Edit/Write/MultiEdit/NotebookEdit) until cleared; shell writes via `Bash` are outside the matcher. | An audit/research/census where the file-editing tools should be structurally unavailable, not merely discouraged. |
 | [`scope-guard`](skills/scope-guard/SKILL.md) | Declares + self-audits write scope; with a paired hook, blocks out-of-scope writes mechanically. | Infra or multi-file work where edits must stay inside a boundary. |
 | [`ship`](skills/ship/SKILL.md) | Finish-discipline gates: RED/GREEN tests → PR → adversarial fail-open review → independent runtime verification before "done". | You are about to say "done", "fixed", "deployed", or "shipped". |
 | [`pre-pr`](skills/pre-pr/SKILL.md) | Repo-contract-aware preflight: detect base branch, run repo-local checks, secret-scan the diff, report severity-graded findings. | Before `gh pr create` / pushing a new PR branch. |
@@ -134,10 +134,17 @@ validated as a Codex set.
 
 ### Worked examples (one per skill)
 
-- **`readonly`**: Starting a "no writes, just census the repo" pass:
-  `~/.claude/scripts/readonly-mode.sh on "audit: dependency graph"` → do the read-only
-  work → `~/.claude/scripts/readonly-mode.sh off`. Any `Edit`/`Write` between the two is
-  denied by the hook.
+- **`readonly`**: Starting a "census the repo without editing it" pass:
+  `~/.claude/skills/readonly/scripts/readonly-mode.sh on "audit: dependency graph"` →
+  do the read-only work → `... off`. Any `Edit`/`Write` between the two is denied by
+  `skills/readonly/hooks/pretooluse-readonly.sh`, which ships here and is executable.
+  Scope it honestly: the matcher covers the file-editing tools, so a write issued
+  through the `Bash` tool (`rm`, `sed -i`, redirection) does not reach the hook. The
+  [skill doc](skills/readonly/SKILL.md) states that boundary and what closing it costs.
+  Prove the part that is enforced on your own machine with
+  `python3 skills/readonly/selftest.py`: it fires the real hook and asserts that eleven
+  marker shapes (malformed, empty, unreadable, a directory, a dangling symlink) all
+  DENY, while two control cases still allow, so an always-blocking gate could not pass.
 - **`scope-guard`**: "Only touch `src/api/` this session." Activate, declare
   `allowed: ["src/api/**"]` / `excluded: ["src/db/**"]`; an attempt to edit
   `src/db/schema.sql` is reported as a Scope Violation and stopped.
