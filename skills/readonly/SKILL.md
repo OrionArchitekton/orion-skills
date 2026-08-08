@@ -27,19 +27,58 @@ The enforcement hook is INERT until the marker is set. Use a small helper to
 manage the marker; do not hand-write the marker JSON:
 
 ```bash
-~/.claude/scripts/readonly-mode.sh on  "audit: <what>"   # enter read-only
-~/.claude/scripts/readonly-mode.sh status                # check
-~/.claude/scripts/readonly-mode.sh off                   # leave (ALWAYS clear)
+skills/readonly/scripts/readonly-mode.sh on  "audit: <what>"   # enter read-only
+skills/readonly/scripts/readonly-mode.sh status                # check
+skills/readonly/scripts/readonly-mode.sh off                   # leave (ALWAYS clear)
 ```
 
 `on` writes `~/.claude/state/readonly.json` `{"active":true,"reason":...}`; the
 hook then denies writes citing that reason. `off` removes it (writes allowed
-again). No marker = no enforcement (safe default).
+again). No marker = no enforcement (safe default). Set `READONLY_MARKER` to
+relocate the marker.
 
-> This skill is the *contract*; the marker helper and the `pretooluse-readonly`
-> hook are the *mechanism*. Wire a PreToolUse hook that returns
-> `permissionDecision: deny` for mutating tools whenever the marker file is
-> `active`. Without that hook the marker is inert (see below).
+## Mechanism (shipped, not left to the reader)
+
+Both halves ship in this repo and are executable:
+
+| File | Role |
+|---|---|
+| `skills/readonly/hooks/pretooluse-readonly.sh` | PreToolUse hook that returns `permissionDecision: deny` |
+| `skills/readonly/scripts/readonly-mode.sh` | marker lifecycle (`on` / `off` / `status`) |
+| `skills/readonly/selftest.py` | fires the real hook and proves it denies |
+
+Register the hook on the file-mutating tools:
+
+```json
+{ "hooks": { "PreToolUse": [ {
+  "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+  "hooks": [ { "type": "command",
+               "command": "$HOME/path/to/skills/readonly/hooks/pretooluse-readonly.sh" } ]
+} ] } }
+```
+
+Verify it on your own machine before trusting it:
+
+```bash
+python3 skills/readonly/selftest.py    # exit 0 = every case behaved
+```
+
+## Fail-closed behavior
+
+The hook is opt-in but not forgiving once opted in:
+
+- **Marker absent**: inert, writes allowed. Read-only mode was never entered.
+- **Marker present and `{"active": true}`**: writes denied.
+- **Marker present and `{"active": false}`**: writes allowed (explicit clear).
+- **Marker present but unreadable, empty, malformed, a directory, or `active`
+  holding any other value**: writes **denied**.
+
+That last row is the point. Under the Claude Code PreToolUse contract only
+`exit 0` with a `deny` decision, or `exit 2`, actually blocks; every other
+non-zero exit lets the tool run. A gate that crashes on unexpected input
+therefore fails open on exactly the input most likely to be hostile, so once the
+marker exists every evaluation failure is routed to `exit 2`. "I could not tell"
+is treated as "block", which is what fail-closed means operationally.
 
 ## Discipline
 

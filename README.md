@@ -135,9 +135,13 @@ validated as a Codex set.
 ### Worked examples (one per skill)
 
 - **`readonly`**: Starting a "no writes, just census the repo" pass:
-  `~/.claude/scripts/readonly-mode.sh on "audit: dependency graph"` → do the read-only
-  work → `~/.claude/scripts/readonly-mode.sh off`. Any `Edit`/`Write` between the two is
-  denied by the hook.
+  `skills/readonly/scripts/readonly-mode.sh on "audit: dependency graph"` → do the
+  read-only work → `skills/readonly/scripts/readonly-mode.sh off`. Any `Edit`/`Write`
+  between the two is denied by `skills/readonly/hooks/pretooluse-readonly.sh`, which
+  ships here and is executable. Prove it on your own machine with
+  `python3 skills/readonly/selftest.py`: it fires the real hook and asserts that ten
+  marker shapes (including malformed, empty, and unreadable) all DENY, while the two
+  control cases still allow, so an always-blocking gate could not pass it.
 - **`scope-guard`**: "Only touch `src/api/` this session." Activate, declare
   `allowed: ["src/api/**"]` / `excluded: ["src/db/**"]`; an attempt to edit
   `src/db/schema.sql` is reported as a Scope Violation and stopped.
