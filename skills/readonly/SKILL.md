@@ -80,11 +80,19 @@ python3 "$RO"/selftest.py    # exit 0 = every case behaved
 
 The hook is opt-in but not forgiving once opted in:
 
-- **Marker absent**: inert, writes allowed. Read-only mode was never entered.
+- **Marker provably absent**: inert, writes allowed. Read-only mode was never
+  entered.
 - **Marker present and `{"active": true}`**: writes denied.
 - **Marker present and `{"active": false}`**: writes allowed (explicit clear).
 - **Marker present but unreadable, empty, malformed, a directory, or `active`
   holding any other value**: writes **denied**.
+- **Marker absence unprovable** (a directory on the marker path is not
+  searchable): writes **denied**, even if `on` was never run. The hook cannot
+  tell "no marker" from "cannot look", and an armed marker may sit below the
+  opaque directory. Recovery: restore search permission (`chmod +x`) on the
+  marker path's ancestors, point `READONLY_MARKER` at a provable path, or
+  unregister the hook; `readonly-mode.sh status` reports this state as
+  `ON (fail-closed)`.
 
 That last row is the point. Under the Claude Code PreToolUse contract only
 `exit 0` with a `deny` decision, or `exit 2`, actually blocks; every other

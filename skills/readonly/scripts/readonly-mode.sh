@@ -7,8 +7,11 @@
 # as "enforce" by the hook (fail-closed), which blocks writes until cleared.
 #
 # Usage:
-#   readonly-mode.sh on  [reason]   enter read-only mode (blocks ALL writes)
-#   readonly-mode.sh off            leave read-only mode (allows writes)
+#   readonly-mode.sh on  [reason]   enter read-only mode (the hook denies the
+#                                   file-editing tools: Edit, Write, MultiEdit,
+#                                   NotebookEdit; Bash is NOT covered, see
+#                                   "What this does NOT do" in SKILL.md)
+#   readonly-mode.sh off            leave read-only mode (allows file edits)
 #   readonly-mode.sh status         report current mode
 #
 # ALWAYS clear when done. The marker is a file on disk, not session state, so a
@@ -120,7 +123,16 @@ except Exception:
     raise
 PY
     then
-      echo "readonly: FAILED to write $MARKER; read-only mode is NOT armed" >&2
+      # The failed write does not prove file edits are allowed: an unwritable or
+      # directory marker path is exactly what the hook fail-closes on, so ask
+      # the hook which state the operator is actually in.
+      marker_state
+      case $? in
+        0|2) echo "readonly: FAILED to write $MARKER; arming did not complete cleanly," >&2
+             echo "  but the hook is DENYING file edits (fail-closed on the existing path)." >&2
+             echo "  Inspect the path, or clear it with 'readonly-mode.sh off'." >&2 ;;
+        *)   echo "readonly: FAILED to write $MARKER; read-only mode is NOT armed" >&2 ;;
+      esac
       exit 1
     fi
 
@@ -129,7 +141,12 @@ PY
     marker_state
     case $? in
       0) echo "readonly: ON ($reason) -> $MARKER"
-         echo "  REMEMBER: run 'readonly-mode.sh off' when done; a stranded marker blocks all writes." ;;
+         echo "  REMEMBER: run 'readonly-mode.sh off' when done; a stranded marker keeps"
+         echo "  denying file edits in later sessions too." ;;
+      2) echo "readonly: FAILED, marker at $MARKER is present but not evaluable;" >&2
+         echo "  the hook is DENYING file edits (fail-closed), not armed as requested." >&2
+         echo "  Inspect the marker, or clear it with 'readonly-mode.sh off'." >&2
+         exit 1 ;;
       *) echo "readonly: FAILED, marker at $MARKER did not read back as active; read-only mode is NOT armed" >&2
          exit 1 ;;
     esac
