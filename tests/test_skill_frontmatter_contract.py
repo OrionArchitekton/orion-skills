@@ -1,5 +1,7 @@
 import re
+import tempfile
 import unittest
+from pathlib import Path
 
 from test_codex_verification_skills_contract import (
     README,
@@ -10,9 +12,12 @@ from test_codex_verification_skills_contract import (
 
 
 SKILLS_DIR = ROOT / "skills"
+# Pinned to the CLI version the install path was verified against, so a later
+# CLI release cannot silently change where skills land.
+SKILLS_CLI_VERSION = "1.5.26"
 SKILLS_CLI_COMMANDS = (
-    "npx skills add OrionArchitekton/orion-skills --list",
-    "npx skills add OrionArchitekton/orion-skills --skill ship -g -a claude-code",
+    f"npx skills@{SKILLS_CLI_VERSION} add OrionArchitekton/orion-skills --list",
+    f"npx skills@{SKILLS_CLI_VERSION} add OrionArchitekton/orion-skills --skill ship -g -a claude-code",
 )
 
 
@@ -23,6 +28,19 @@ class SkillFrontmatterContractTest(unittest.TestCase):
     silently skip a skill whose YAML is invalid, so a lenient local loader is
     not evidence the skill is discoverable.
     """
+
+    def test_frontmatter_loader_rejects_duplicate_keys(self):
+        # The skills CLI's YAML parser rejects duplicate mapping keys; PyYAML's
+        # safe_load silently keeps the last value, so the helper must reject them
+        # itself or a skill the CLI skips would still pass this contract.
+        with tempfile.TemporaryDirectory() as tmp:
+            skill_path = Path(tmp) / "SKILL.md"
+            skill_path.write_text(
+                "---\nname: dup\ndescription: first\nname: dup\n---\n\nbody\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(AssertionError, "invalid YAML frontmatter"):
+                frontmatter_fields(skill_path)
 
     def test_every_skill_directory_has_a_skill_file(self):
         skill_dirs = sorted(path for path in SKILLS_DIR.iterdir() if path.is_dir())
@@ -56,6 +74,11 @@ class SkillFrontmatterContractTest(unittest.TestCase):
         self.assertEqual(commands, SKILLS_CLI_COMMANDS)
 
         normalized = " ".join(section.split())
+        self.assertIn(f"skills@{SKILLS_CLI_VERSION}", normalized)
+        # npx itself downloads the CLI package, so the list step installs no
+        # skills but is not install-free.
+        self.assertNotRegex(normalized, r"installs nothing")
+        self.assertIn("installs no skills", normalized)
         self.assertIn("DISABLE_TELEMETRY=1", normalized)
         self.assertIn("have not been validated against this library", normalized)
 

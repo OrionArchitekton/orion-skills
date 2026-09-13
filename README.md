@@ -42,14 +42,16 @@ their frontmatter.
 ### skills CLI
 
 The [`skills` CLI](https://github.com/vercel-labs/skills) can list and install skills
-straight from this repository. Verified with `skills@1.5.26` for Claude Code:
+straight from this repository. The commands below are pinned to `skills@1.5.26`, the
+version verified for Claude Code; `npx` downloads that CLI package into its cache on
+first use.
 
 ```bash
-# see what the repository offers; installs nothing
-npx skills add OrionArchitekton/orion-skills --list
+# see what the repository offers; installs no skills
+npx skills@1.5.26 add OrionArchitekton/orion-skills --list
 
 # install one skill globally for Claude Code
-npx skills add OrionArchitekton/orion-skills --skill ship -g -a claude-code
+npx skills@1.5.26 add OrionArchitekton/orion-skills --skill ship -g -a claude-code
 ```
 
 The CLI sends anonymous usage telemetry by default; set `DISABLE_TELEMETRY=1` to opt
