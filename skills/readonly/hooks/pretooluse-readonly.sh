@@ -78,13 +78,32 @@ INPUT=$(head -c 16384 2>/dev/null)
 READONLY_EVENT="$INPUT" python3 - "$MARKER" <<'PY'
 import json
 import os
+import stat
 import sys
 
 marker_path = sys.argv[1]
 
+# Evaluation must finish, or the harness kills the hook and the write runs anyway.
+# A plain open() of a FIFO blocks until a writer appears, and a character device
+# such as /dev/zero never ends. Open without blocking, then judge the descriptor
+# itself (not the path, which could be swapped in between): only a regular file
+# is read; anything else denies.
 try:
-    with open(marker_path) as fh:
-        marker = json.load(fh)
+    fd = os.open(marker_path, os.O_RDONLY | os.O_NONBLOCK)
+except Exception:
+    sys.exit(1)                 # missing target / unreadable -> trap -> exit 2 -> BLOCK
+try:
+    if not stat.S_ISREG(os.fstat(fd).st_mode):
+        os.close(fd)
+        sys.exit(1)             # FIFO, device, socket, directory -> BLOCK without reading
+    # A real marker is a few bytes. Read one past the cap so an oversized file
+    # (even a sparse one that would take minutes to read) denies immediately.
+    MARKER_MAX_BYTES = 64 * 1024
+    with os.fdopen(fd, "rb") as fh:
+        data = fh.read(MARKER_MAX_BYTES + 1)
+    if len(data) > MARKER_MAX_BYTES:
+        sys.exit(1)             # oversized -> BLOCK without reading the rest
+    marker = json.loads(data.decode("utf-8"))
 except Exception:
     sys.exit(1)                 # unreadable / malformed / empty -> trap -> exit 2 -> BLOCK
 

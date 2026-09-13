@@ -30,12 +30,19 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
 
 HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hooks", "pretooluse-readonly.sh")
+
+# Generous for a hook that only reads a tiny marker; a hang must not look like a block.
+HOOK_TIMEOUT_SEC = 10
+
+# Descriptors a case must keep open while the hook runs; closed after each case.
+_HELD_FDS: list[int] = []
 
 BLOCK = "BLOCK"
 ALLOW = "ALLOW"
@@ -50,18 +57,29 @@ def fire(marker_path: str, event: str = SAMPLE_EVENT) -> tuple[str, str]:
     """Run the hook for real. Return (verdict, detail)."""
     env = dict(os.environ)
     env["READONLY_MARKER"] = marker_path
-    proc = subprocess.run(
+    # Own session so a hung hook's whole process group (bash AND its python3 child)
+    # can be killed; killing only bash would orphan a child blocked on the marker.
+    proc = subprocess.Popen(
         ["bash", HOOK],
-        input=event,
-        capture_output=True,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
         env=env,
-        timeout=30,
+        start_new_session=True,
     )
+    try:
+        stdout, _stderr = proc.communicate(event, timeout=HOOK_TIMEOUT_SEC)
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        proc.communicate()
+        # A hook the harness has to kill produces neither exit 2 nor a deny, so a
+        # hang is fail-open, not a slow block.
+        return ALLOW, "timed out after %ss (fail-open when the harness kills it)" % HOOK_TIMEOUT_SEC
     if proc.returncode == 2:
         return BLOCK, "exit 2"
     if proc.returncode == 0:
-        out = (proc.stdout or "").strip()
+        out = (stdout or "").strip()
         if not out:
             return ALLOW, "exit 0, no output"
         try:
@@ -103,6 +121,45 @@ def cases():
         os.mkdir(p)
         return p
     yield ("marker that is a directory denies", BLOCK, _dir)
+
+    def _fifo(d):
+        # Opening a FIFO for reading blocks until a writer appears, so a hook that
+        # just open()s the marker hangs until the harness kills it: fail-open.
+        p = os.path.join(d, "readonly.json")
+        os.mkfifo(p)
+        return p
+    yield ("FIFO marker denies without hanging", BLOCK, _fifo)
+
+    def _pipe_claiming_cleared(d):
+        # A FIFO whose buffer already holds a valid "cleared" marker. Opened
+        # read-write it needs no separate writer, so the content is there when the
+        # hook reads. A hook that parses anything it can open would ALLOW writes
+        # through a marker that is not a file at all; only a regular file counts.
+        p = os.path.join(d, "readonly.json")
+        os.mkfifo(p)
+        fd = os.open(p, os.O_RDWR | os.O_NONBLOCK)
+        os.write(fd, b'{"active": false}')
+        _HELD_FDS.append(fd)
+        return p
+    yield ("FIFO holding a cleared marker still denies", BLOCK, _pipe_claiming_cleared)
+
+    def _endless_device(d):
+        # A marker linked to a character device that never ends: reading it to
+        # parse JSON would run until the harness kills the hook.
+        p = os.path.join(d, "readonly.json")
+        os.symlink("/dev/zero", p)
+        return p
+    if os.path.exists("/dev/zero"):
+        yield ("marker linked to an endless device denies without hanging", BLOCK, _endless_device)
+
+    def _oversized(d):
+        # A regular file far larger than any marker (sparse, so it costs no disk):
+        # parsing it whole would outlast the harness timeout.
+        p = os.path.join(d, "readonly.json")
+        with open(p, "wb") as fh:
+            fh.truncate(64 * 1024 ** 3)
+        return p
+    yield ("oversized marker denies without reading it all", BLOCK, _oversized)
 
     def _dangling_symlink(d):
         # `test -e` follows symlinks, so a dangling link looks ABSENT to it while
@@ -182,6 +239,8 @@ def run_all():
             marker = setup(d)
             actual, detail = fire(marker)
         finally:
+            while _HELD_FDS:
+                os.close(_HELD_FDS.pop())
             try:
                 os.chmod(d, stat.S_IRWXU)
             except OSError:

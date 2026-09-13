@@ -6,6 +6,15 @@ an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
 
 ## [Unreleased]
 
+### Fixed
+
+- `readonly` hook: a marker that is not a regular file (a named pipe, a device, a
+  socket) or is larger than 64 KiB now denies immediately. Previously a named pipe or
+  an endless device at the marker path made the hook hang until the harness killed it,
+  which lets the write run, and a pipe preloaded with `{"active": false}` could be read
+  as a cleared marker. The self-test adds those cases and now kills a hung hook's whole
+  process group instead of orphaning its child.
+
 ### Changed
 
 - Added a verified Codex CLI starter set for `reprobe-stale-premise`,
