@@ -14,6 +14,11 @@ an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
   and a compatibility contract in CI.
 - Quoted `reprobe-stale-premise` frontmatter so it is valid YAML and passes the
   OpenAI skill validator.
+- Quoted `goal-prompt` frontmatter so strict YAML loaders stop skipping it (the
+  `skills` CLI listed 25 of 26 skills), and added a contract test that parses every
+  skill's frontmatter strictly instead of only the Codex starter set.
+- Documented listing and installing skills with the `skills` CLI, verified for
+  Claude Code, including its telemetry opt-out.
 
 ## [0.5.1] - 2026-07-24
 
