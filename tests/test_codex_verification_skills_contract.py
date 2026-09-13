@@ -46,6 +46,25 @@ FORBIDDEN_README_CLAIMS = (
 )
 
 
+class UniqueKeySafeLoader(yaml.SafeLoader):
+    """SafeLoader that rejects duplicate mapping keys.
+
+    Strict installers (the `yaml` npm package behind the skills CLI) reject a
+    repeated key; PyYAML's safe_load silently keeps the last value.
+    """
+
+    def construct_mapping(self, node, deep=False):
+        seen = set()
+        for key_node, _ in node.value:
+            key = self.construct_object(key_node, deep=deep)
+            if key in seen:
+                raise yaml.constructor.ConstructorError(
+                    None, None, f"duplicate key {key!r}", key_node.start_mark
+                )
+            seen.add(key)
+        return super().construct_mapping(node, deep=deep)
+
+
 def frontmatter_fields(skill_path: Path) -> dict[str, object]:
     content = skill_path.read_text(encoding="utf-8")
     match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
@@ -53,7 +72,7 @@ def frontmatter_fields(skill_path: Path) -> dict[str, object]:
         raise AssertionError(f"{skill_path} has invalid frontmatter markers")
 
     try:
-        fields = yaml.safe_load(match.group(1))
+        fields = yaml.load(match.group(1), Loader=UniqueKeySafeLoader)
     except yaml.YAMLError as exc:
         raise AssertionError(f"{skill_path} has invalid YAML frontmatter") from exc
     if not isinstance(fields, dict):

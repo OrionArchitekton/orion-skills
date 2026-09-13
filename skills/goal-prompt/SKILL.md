@@ -1,6 +1,6 @@
 ---
 name: goal-prompt
-description: Use when you're asked to build, write, or author a goal prompt: a /goal, research, audit, decision, or implementation prompt that gets fired with /goal or /deep-research and runs autonomously. Triggers: "build a /goal prompt", "build a research goal prompt for X", "write a goal prompt for X", "goal prompt for X". Builds the prompt; never fires it.
+description: 'Use when you''re asked to build, write, or author a goal prompt: a /goal, research, audit, decision, or implementation prompt that gets fired with /goal or /deep-research and runs autonomously. Triggers: "build a /goal prompt", "build a research goal prompt for X", "write a goal prompt for X", "goal prompt for X". Builds the prompt; never fires it.'
 ---
 
 # goal-prompt: build a fire-ready autonomous goal prompt
