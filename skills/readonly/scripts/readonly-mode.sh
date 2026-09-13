@@ -100,18 +100,27 @@ case "$cmd" in
     # on it and blocks every write, while this script would be reporting "NOT
     # armed". Rename is atomic on the same filesystem, so the marker is either
     # the previous state or a complete new one, and never a torn one.
-    if ! READONLY_REASON="$reason" python3 - "$MARKER" <<'PY'
+    READONLY_REASON="$reason" python3 - "$MARKER" <<'PY'
 import json
 import os
 import sys
 import tempfile
 
+# The hook denies any marker over this size without reading it (it must never
+# hang on a huge file). A marker this helper writes must fit, or `on` would
+# leave a marker that blocks every edit while reporting failure.
+MARKER_MAX_BYTES = 64 * 1024
+
 target = sys.argv[1]
+payload = json.dumps({"active": True, "reason": os.environ.get("READONLY_REASON", "")}).encode("utf-8")
+if len(payload) > MARKER_MAX_BYTES:
+    sys.exit(3)                 # refuse before touching the filesystem
+
 directory = os.path.dirname(target) or "."
 fd, tmp = tempfile.mkstemp(dir=directory, prefix=".readonly-", suffix=".tmp")
 try:
-    with os.fdopen(fd, "w") as fh:
-        json.dump({"active": True, "reason": os.environ.get("READONLY_REASON", "")}, fh)
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(payload)
         fh.flush()
         os.fsync(fh.fileno())
     os.replace(tmp, target)
@@ -122,7 +131,17 @@ except Exception:
         pass
     raise
 PY
-    then
+    write_rc=$?
+    if [ "$write_rc" -eq 3 ]; then
+      echo "readonly: FAILED, the reason is too long (the marker would exceed the hook's 64 KiB limit)." >&2
+      marker_state
+      case $? in
+        0|2) echo "  Nothing was written; file edits are still DENIED by the existing marker." >&2 ;;
+        *)   echo "  Nothing was written; read-only mode is NOT armed." >&2 ;;
+      esac
+      exit 1
+    fi
+    if [ "$write_rc" -ne 0 ]; then
       # The failed write does not prove file edits are allowed: an unwritable or
       # directory marker path is exactly what the hook fail-closes on, so ask
       # the hook which state the operator is actually in.

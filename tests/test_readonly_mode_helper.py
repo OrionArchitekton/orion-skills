@@ -64,6 +64,27 @@ class OnReportsTruth(unittest.TestCase):
             self.assertNotIn("NOT armed", combined)
 
 
+    def test_on_refuses_a_reason_too_long_for_the_hook_to_read(self):
+        # The hook denies markers over 64 KiB without reading them, so a marker
+        # the helper wrote from a huge reason would block every edit while `on`
+        # reported failure. Refuse before writing anything instead.
+        with tempfile.TemporaryDirectory() as d:
+            marker = os.path.join(d, "readonly.json")
+            proc = run_helper(["on", "x" * 70000], marker)
+            self.assertNotEqual(0, proc.returncode, "on must refuse an oversized reason")
+            self.assertFalse(os.path.exists(marker), "no marker may be written for a refused reason")
+            combined = proc.stdout + proc.stderr
+            self.assertIn("reason is too long", combined)
+            self.assertIn("NOT armed", combined)
+
+    def test_on_accepts_a_long_reason_that_still_fits_the_hook_cap(self):
+        with tempfile.TemporaryDirectory() as d:
+            marker = os.path.join(d, "readonly.json")
+            proc = run_helper(["on", "y" * 60000], marker)
+            self.assertEqual(0, proc.returncode, proc.stderr)
+            self.assertIn("readonly: ON", proc.stdout)
+
+
 class OffReportsTruth(unittest.TestCase):
     def test_off_clears_a_normal_marker(self):
         with tempfile.TemporaryDirectory() as d:
