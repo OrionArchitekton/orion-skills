@@ -86,6 +86,14 @@ The hook is opt-in but not forgiving once opted in:
 - **Marker present and `{"active": false}`**: writes allowed (explicit clear).
 - **Marker present but unreadable, empty, malformed, a directory, or `active`
   holding any other value**: writes **denied**.
+- **Marker present but not a regular file** (a named pipe, a device, a socket, or a
+  symlink to one) **or larger than 64 KiB**: writes **denied**, without waiting on or
+  reading the rest of it. Evaluation finishes promptly on local files: a hook that
+  hangs is killed by the harness, and a killed hook lets the write run. For the same
+  reason `readonly-mode.sh on` refuses a reason too long for its marker to fit, and
+  the marker belongs on local disk (the default path): a regular file on a network or
+  FUSE mount that stops responding can still stall the read, which no in-hook check
+  can bound.
 - **Marker absence unprovable** (a directory on the marker path is not
   searchable): writes **denied**, even if `on` was never run. The hook cannot
   tell "no marker" from "cannot look", and an armed marker may sit below the
