@@ -161,6 +161,12 @@ def cases():
         return p
     yield ("oversized marker denies without reading it all", BLOCK, _oversized)
 
+    # An oversized marker that parses as a CLEARED marker: json.loads accepts the
+    # trailing whitespace, so a hook that read (or parsed a prefix of) the whole
+    # file would ALLOW writes. The size cap must deny regardless of content.
+    yield ("oversized marker that parses as cleared still denies", BLOCK,
+           write('{"active": false}' + " " * (70 * 1024)))
+
     def _dangling_symlink(d):
         # `test -e` follows symlinks, so a dangling link looks ABSENT to it while
         # obviously being a marker someone placed. Treating it as absent would

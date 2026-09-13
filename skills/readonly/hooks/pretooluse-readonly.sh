@@ -88,6 +88,15 @@ marker_path = sys.argv[1]
 # such as /dev/zero never ends. Open without blocking, then judge the descriptor
 # itself (not the path, which could be swapped in between): only a regular file
 # is read; anything else denies.
+#
+# stat() first, which never opens the node: O_NONBLOCK is not a guarantee for
+# every device type, so a pipe or device is denied before any open() can stall.
+# The descriptor check below still guards a path swapped between the two calls.
+try:
+    if not stat.S_ISREG(os.stat(marker_path).st_mode):
+        sys.exit(1)             # FIFO, device, socket, directory -> BLOCK without opening
+except OSError:
+    sys.exit(1)                 # missing target / unsearchable -> BLOCK
 try:
     fd = os.open(marker_path, os.O_RDONLY | os.O_NONBLOCK)
 except Exception:

@@ -12,8 +12,11 @@ an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
   socket) or is larger than 64 KiB now denies immediately. Previously a named pipe or
   an endless device at the marker path made the hook hang until the harness killed it,
   which lets the write run, and a pipe preloaded with `{"active": false}` could be read
-  as a cleared marker. The self-test adds those cases and now kills a hung hook's whole
-  process group instead of orphaning its child.
+  as a cleared marker. The hook now checks the file type before opening anything,
+  opens without blocking, re-checks the open descriptor, and reads at most 64 KiB;
+  `readonly-mode.sh on` refuses a reason too long to fit. The self-test adds those
+  cases (including an oversized marker that parses as cleared) and now kills a hung
+  hook's whole process group instead of orphaning its child.
 
 ### Changed
 
