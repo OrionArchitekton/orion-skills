@@ -70,28 +70,63 @@ trap 'rc=$?; [ "$rc" -eq 0 ] && exit 0; echo "[readonly] marker $MARKER is prese
 
 command -v python3 >/dev/null 2>&1 || exit 2
 
-# Cap the event before it becomes an environment variable. The payload is used
-# ONLY to name the tool and path in the deny message, but an oversized env block
-# can make execve fail with E2BIG, and the fail-closed trap would then turn that
-# into a BLOCK even for a marker that says {"active": false}. Capping keeps the
-# decoration useful without letting payload size change the decision.
-INPUT=$(head -c 16384 2>/dev/null)
-# Drain the rest in the background so a large Write payload never meets a closed
-# pipe (EPIPE in the harness writer could surface as a non-2 failure, which fails
-# open), without waiting for the caller to finish writing: a stalled caller must
-# not hold the decision until the harness kills the hook. The explicit <&0 matters:
-# a background job in a non-interactive shell otherwise reads /dev/null.
-cat <&0 >/dev/null 2>&1 &
-
+# The decision never depends on the event payload: it only names the tool and path
+# in the deny message. So nothing reads stdin before the marker is judged. A
+# blocking read there (even `head -c`) lets a caller that stalls mid-write hold
+# the hook until the harness kills it, and a killed hook fails open. The caller's
+# stdin reaches python on fd 3 (fd 0 carries the script), where it is read with
+# a deadline, only once the answer is already "deny".
+#
 # -I (isolated): the harness runs hooks from the session cwd, and plain `python3 -`
 # puts that directory first on sys.path, so a json.py in an audited repo would
 # replace the stdlib, disable the gate, and run on every edit attempt. -I also
 # ignores PYTHON* env vars and the user site directory.
-READONLY_EVENT="$INPUT" python3 -I - "$MARKER" <<'PY'
+python3 -I - "$MARKER" 3<&0 <<'PY'
 import json
 import os
+import select
 import stat
 import sys
+import time
+
+EVENT_FD = 3
+EVENT_MAX_BYTES = 16 * 1024     # decoration only; a Write payload can be megabytes
+EVENT_READ_SEC = 1.0            # a well-behaved caller has already closed stdin
+DRAIN_SEC = 2.0
+
+
+def read_with_deadline(fd, keep_bytes, seconds):
+    """Read fd until EOF, keep_bytes kept, or the deadline; never block past it.
+    keep_bytes=0 discards everything read (a drain)."""
+    kept = bytearray()
+    deadline = time.monotonic() + seconds
+    try:
+        os.set_blocking(fd, False)
+    except OSError:
+        return b""              # no usable stdin: nothing to read or drain
+    while True:
+        left = deadline - time.monotonic()
+        if left <= 0:
+            break
+        try:
+            ready, _, _ = select.select([fd], [], [], left)
+        except (OSError, ValueError):
+            break
+        if not ready:
+            break
+        try:
+            chunk = os.read(fd, 65536)
+        except BlockingIOError:
+            continue
+        except OSError:
+            break
+        if not chunk:
+            break               # EOF
+        if keep_bytes:
+            kept += chunk[: keep_bytes - len(kept)]
+            if len(kept) >= keep_bytes:
+                break
+    return bytes(kept)
 
 marker_path = sys.argv[1]
 
@@ -139,9 +174,10 @@ if active is not True:
     sys.exit(1)                 # missing / null / "true" / 1 / anything else -> BLOCK
 
 # Marker is active: deny the write. The event payload is best-effort decoration
-# only; a malformed event must never downgrade the decision.
+# only; a malformed, truncated, or never-finished event must never downgrade the
+# decision.
 try:
-    event = json.loads(os.environ.get("READONLY_EVENT") or "{}")
+    event = json.loads(read_with_deadline(EVENT_FD, EVENT_MAX_BYTES, EVENT_READ_SEC) or b"{}")
 except Exception:
     event = {}
 if not isinstance(event, dict):
@@ -165,6 +201,9 @@ print(json.dumps({
             "Clear it with `readonly-mode.sh off` (or remove {path})."
         ).format(tool=tool, target=target, reason=reason, path=marker_path),
     }
-}))
+}), flush=True)
+# Drain what the caller is still writing so a large payload does not meet a closed
+# pipe, bounded so a stalled caller cannot keep this process alive.
+read_with_deadline(EVENT_FD, 0, DRAIN_SEC)
 sys.exit(0)
 PY

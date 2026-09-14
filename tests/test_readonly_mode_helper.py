@@ -358,6 +358,80 @@ class HookNeverWaitsOnTheCaller(unittest.TestCase):
             self.assertNotIn("readonly: OFF", proc.stdout)
             self.assertIn("UNKNOWN", proc.stdout + proc.stderr)
 
+    def test_decides_when_a_short_prefix_stalls(self):
+        """A caller that sends less than the event cap and keeps stdin open must not
+        park the hook in a read before the marker is evaluated."""
+        with tempfile.TemporaryDirectory() as d:
+            env = dict(os.environ, READONLY_MARKER=self._active_marker(d))
+            proc = subprocess.Popen([self.HOOK], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                    stderr=subprocess.DEVNULL, env=env, start_new_session=True)
+            try:
+                proc.stdin.write(b'{"tool_name": "Write", "tool_input": {"file_path": "/x"')
+                proc.stdin.flush()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    os.killpg(proc.pid, 9)
+                    self.fail("hook parked in a stdin read on a short stalled prefix")
+                self.assertIn(b'"deny"', proc.stdout.read())
+            finally:
+                proc.stdin.close()
+                proc.stdout.close()
+
+    def test_decides_when_the_caller_opens_stdin_and_sends_nothing(self):
+        with tempfile.TemporaryDirectory() as d:
+            env = dict(os.environ, READONLY_MARKER=self._active_marker(d))
+            proc = subprocess.Popen([self.HOOK], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                    stderr=subprocess.DEVNULL, env=env, start_new_session=True)
+            try:
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    os.killpg(proc.pid, 9)
+                    self.fail("hook blocked reading an open, silent stdin")
+                self.assertIn(b'"deny"', proc.stdout.read())
+            finally:
+                proc.stdin.close()
+                proc.stdout.close()
+
+    def test_leaves_no_process_behind_when_the_caller_stalls(self):
+        """Whatever the hook does with the rest of stdin, it must be finished when the
+        hook exits: nothing may keep reading from a stalled caller afterwards."""
+        with tempfile.TemporaryDirectory() as d:
+            env = dict(os.environ, READONLY_MARKER=self._active_marker(d))
+            proc = subprocess.Popen([self.HOOK], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                    stderr=subprocess.DEVNULL, env=env, start_new_session=True)
+            try:
+                proc.stdin.write(b"x" * 20000)
+                proc.stdin.flush()
+                try:
+                    proc.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    os.killpg(proc.pid, 9)
+                    self.fail("hook did not exit on a stalled caller")
+                import time
+                time.sleep(0.3)
+                try:
+                    os.killpg(proc.pid, 0)
+                    lingering = True
+                except ProcessLookupError:
+                    lingering = False
+                if lingering:
+                    os.killpg(proc.pid, 9)
+                self.assertFalse(lingering, "a process from the hook outlived it, still attached to the caller's stdin")
+            finally:
+                proc.stdin.close()
+                proc.stdout.close()
+
+    def test_deny_still_names_the_tool_and_path_from_the_event(self):
+        with tempfile.TemporaryDirectory() as d:
+            env = dict(os.environ, READONLY_MARKER=self._active_marker(d))
+            proc = subprocess.run([self.HOOK], input='{"tool_name": "Edit", "tool_input": {"file_path": "/srv/app.py"}}',
+                                  capture_output=True, text=True, env=env, timeout=30)
+            reason = json.loads(proc.stdout)["hookSpecificOutput"]["permissionDecisionReason"]
+            self.assertIn("Edit", reason)
+            self.assertIn("/srv/app.py", reason)
+
 
 if __name__ == "__main__":
     unittest.main()

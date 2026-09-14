@@ -15,10 +15,13 @@ an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
   The hook and `readonly-mode.sh` now run python isolated (`-I`). A fail-closed
   denial now prints the marker path and recovery commands on stderr instead of
   blocking silently; `status` runs the hook file directly and reports UNKNOWN for a
-  hook the harness could not execute or start (exit 126/127); the hook drains stdin
-  past its 16 KiB cap in the background, so a large payload never meets a closed pipe
-  and a caller that stalls mid-write cannot hold the decision. The self-test runs the
-  hook file directly, as the harness does.
+  hook the harness could not execute or start (exit 126/127). The hook no longer reads
+  stdin before deciding: the payload only decorates the deny message, so it is read
+  after the marker says deny, with a 1 s deadline and a 16 KiB cap, and the rest is
+  drained for at most 2 s. A caller that stalls mid-write, or never writes, cannot hold
+  the hook until the harness kills it, a large payload does not meet a closed pipe, and
+  no process outlives the hook. The self-test runs the hook file directly, as the
+  harness does.
 - `readonly` hook: a marker that is not a regular file (a named pipe, a device, a
   socket) or is larger than 64 KiB now denies immediately. Previously a named pipe or
   an endless device at the marker path made the hook hang until the harness killed it,
