@@ -60,13 +60,16 @@ need_python() {
 HOOK="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks/pretooluse-readonly.sh"
 
 marker_state() {
-  if [ ! -x "$HOOK" ] && [ ! -f "$HOOK" ]; then
-    echo "readonly: ERROR, cannot find the enforcement hook at $HOOK" >&2
+  # The harness executes the hook file itself; a hook that is not executable
+  # fails open there, so asking it through `bash` would report a gate that the
+  # harness never runs. Require -x and invoke it the same way.
+  if [ ! -f "$HOOK" ] || [ ! -x "$HOOK" ]; then
+    echo "readonly: ERROR, the enforcement hook at $HOOK is missing or not executable" >&2
     return 3
   fi
   local out rc
   out=$(printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"<status probe>"}}' \
-        | READONLY_MARKER="$MARKER" bash "$HOOK" 2>/dev/null)
+        | READONLY_MARKER="$MARKER" "$HOOK" 2>/dev/null)
   rc=$?
   if [ "$rc" -eq 2 ]; then
     return 2
@@ -100,7 +103,7 @@ case "$cmd" in
     # on it and blocks every write, while this script would be reporting "NOT
     # armed". Rename is atomic on the same filesystem, so the marker is either
     # the previous state or a complete new one, and never a torn one.
-    READONLY_REASON="$reason" python3 - "$MARKER" <<'PY'
+    READONLY_REASON="$reason" python3 -I - "$MARKER" <<'PY'
 import json
 import os
 import sys

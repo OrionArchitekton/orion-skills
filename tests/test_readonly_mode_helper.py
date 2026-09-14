@@ -237,3 +237,52 @@ class SelftestCliPath(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HookRunsIsolatedFromTheSessionCwd(unittest.TestCase):
+    """The harness runs the hook from the session directory, and a hook the harness
+    cannot run (not executable) or that crashes without a deny is fail-open."""
+
+    HOOK = os.path.join(SKILL_DIR, "hooks", "pretooluse-readonly.sh")
+
+    def test_status_is_not_fooled_by_a_json_module_in_the_cwd(self):
+        with tempfile.TemporaryDirectory() as d:
+            marker = os.path.join(d, "readonly.json")
+            with open(marker, "w") as fh:
+                fh.write('{"active": true}')
+            repo = os.path.join(d, "audited-repo")
+            os.mkdir(repo)
+            with open(os.path.join(repo, "json.py"), "w") as fh:
+                fh.write("import sys\nsys.exit(0)\n")
+            env = dict(os.environ, READONLY_MARKER=marker)
+            proc = subprocess.run(["bash", HELPER, "status"], capture_output=True,
+                                  text=True, env=env, cwd=repo, timeout=30)
+            self.assertIn("readonly: ON", proc.stdout, proc.stdout + proc.stderr)
+
+    def test_a_fail_closed_deny_says_which_marker_and_how_to_recover(self):
+        with tempfile.TemporaryDirectory() as d:
+            marker = os.path.join(d, "readonly.json")
+            with open(marker, "w") as fh:
+                fh.write("{not json")
+            proc = subprocess.run([self.HOOK], input='{"tool_name": "Write"}',
+                                  capture_output=True, text=True,
+                                  env=dict(os.environ, READONLY_MARKER=marker), timeout=30)
+            self.assertEqual(2, proc.returncode)
+            self.assertIn(marker, proc.stderr)
+            self.assertIn("readonly-mode.sh", proc.stderr)
+
+    def test_status_does_not_report_on_for_a_hook_the_harness_cannot_execute(self):
+        import shutil
+        with tempfile.TemporaryDirectory() as d:
+            tree = os.path.join(d, "readonly")
+            shutil.copytree(SKILL_DIR, tree)
+            hook = os.path.join(tree, "hooks", "pretooluse-readonly.sh")
+            os.chmod(hook, 0o644)
+            marker = os.path.join(d, "readonly.json")
+            with open(marker, "w") as fh:
+                fh.write('{"active": true}')
+            proc = subprocess.run(["bash", os.path.join(tree, "scripts", "readonly-mode.sh"), "status"],
+                                  capture_output=True, text=True,
+                                  env=dict(os.environ, READONLY_MARKER=marker), timeout=30)
+            self.assertNotEqual(0, proc.returncode, proc.stdout)
+            self.assertNotIn("readonly: ON", proc.stdout)

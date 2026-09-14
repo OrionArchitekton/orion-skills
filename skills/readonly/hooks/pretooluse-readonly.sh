@@ -51,7 +51,7 @@ if [ ! -e "$MARKER" ] && [ ! -L "$MARKER" ]; then
   _probe=$(dirname "$MARKER")
   while :; do
     if [ -d "$_probe" ]; then
-      [ -x "$_probe" ] || exit 2
+      [ -x "$_probe" ] || { echo "[readonly] cannot search $_probe, so the marker $MARKER may be armed but unreadable; file edits are blocked (fail-closed). Fix the directory permissions or run readonly-mode.sh status." >&2; exit 2; }
       break
     fi
     _parent=$(dirname "$_probe")
@@ -64,7 +64,9 @@ fi
 # Past this point the operator has entered read-only mode. Any non-zero exit,
 # including a crash, becomes exit 2 (BLOCK). A blanket `trap exit 0` here would
 # reintroduce the fail-open hole this hook exists to close.
-trap 'rc=$?; [ "$rc" -eq 0 ] && exit 0; exit 2' EXIT
+# The message goes to stderr, which the harness shows the agent on exit 2, so a
+# fail-closed block always says which marker and how to recover.
+trap 'rc=$?; [ "$rc" -eq 0 ] && exit 0; echo "[readonly] marker $MARKER is present but could not be evaluated; file edits are blocked (fail-closed). Inspect it with readonly-mode.sh status, clear it with readonly-mode.sh off." >&2; exit 2' EXIT
 
 command -v python3 >/dev/null 2>&1 || exit 2
 
@@ -74,8 +76,15 @@ command -v python3 >/dev/null 2>&1 || exit 2
 # into a BLOCK even for a marker that says {"active": false}. Capping keeps the
 # decoration useful without letting payload size change the decision.
 INPUT=$(head -c 16384 2>/dev/null)
+# Drain the rest so a large Write payload never meets a closed pipe (EPIPE in the
+# harness writer could surface as a non-2 failure, which fails open).
+cat >/dev/null 2>&1
 
-READONLY_EVENT="$INPUT" python3 - "$MARKER" <<'PY'
+# -I (isolated): the harness runs hooks from the session cwd, and plain `python3 -`
+# puts that directory first on sys.path, so a json.py in an audited repo would
+# replace the stdlib, disable the gate, and run on every edit attempt. -I also
+# ignores PYTHON* env vars and the user site directory.
+READONLY_EVENT="$INPUT" python3 -I - "$MARKER" <<'PY'
 import json
 import os
 import stat
