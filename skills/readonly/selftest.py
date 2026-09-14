@@ -53,19 +53,21 @@ SAMPLE_EVENT = json.dumps({
 })
 
 
-def fire(marker_path: str, event: str = SAMPLE_EVENT) -> tuple[str, str]:
-    """Run the hook for real. Return (verdict, detail)."""
+def fire(marker_path: str, event: str = SAMPLE_EVENT, cwd: str | None = None) -> tuple[str, str]:
+    """Run the hook for real, from `cwd` like the harness runs it from the session
+    directory. Return (verdict, detail)."""
     env = dict(os.environ)
     env["READONLY_MARKER"] = marker_path
     # Own session so a hung hook's whole process group (bash AND its python3 child)
     # can be killed; killing only bash would orphan a child blocked on the marker.
     proc = subprocess.Popen(
-        ["bash", HOOK],
+        [HOOK],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
         env=env,
+        cwd=cwd,
         start_new_session=True,
     )
     try:
@@ -217,6 +219,21 @@ def cases():
     if os.geteuid() != 0:
         yield ("marker hidden by an unsearchable ANCESTOR denies", BLOCK, _unsearchable_ancestor)
 
+    def _shadowing_json_in_cwd(d):
+        # The harness runs hooks from the session directory, which is the repo being
+        # audited. A json.py there must not replace the stdlib module inside the
+        # hook's python: this one exits 0 before anything is printed, which the
+        # harness reads as ALLOW, and it would run on every edit attempt.
+        cwd = os.path.join(d, "audited-repo")
+        os.mkdir(cwd)
+        with open(os.path.join(cwd, "json.py"), "w") as fh:
+            fh.write("import sys\nsys.exit(0)\n")
+        p = os.path.join(d, "readonly.json")
+        with open(p, "w") as fh:
+            fh.write('{"active": true}')
+        return p, cwd
+    yield ("json.py in the session cwd cannot disable the gate", BLOCK, _shadowing_json_in_cwd)
+
     # ---- Controls: these MUST allow, or the suite is just a blanket blocker ----
     def _absent(d):
         return os.path.join(d, "does-not-exist.json")
@@ -242,8 +259,10 @@ def run_all():
     for name, expected, setup in cases():
         d = tempfile.mkdtemp(prefix="readonly-selftest-")
         try:
-            marker = setup(d)
-            actual, detail = fire(marker)
+            marker, cwd = setup(d), None
+            if isinstance(marker, tuple):
+                marker, cwd = marker
+            actual, detail = fire(marker, cwd=cwd)
         finally:
             while _HELD_FDS:
                 os.close(_HELD_FDS.pop())

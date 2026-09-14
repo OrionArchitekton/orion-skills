@@ -94,6 +94,14 @@ The hook is opt-in but not forgiving once opted in:
   the marker belongs on local disk (the default path): a regular file on a network or
   FUSE mount that stops responding can still stall the read, which no in-hook check
   can bound.
+- **Every denial that is not an active marker explains itself**: the hook exits 2
+  with a line on stderr naming the marker path and the `status` / `off` recovery
+  commands, which the harness shows the agent.
+- **The session directory cannot change the verdict**: the hook's python runs
+  isolated (`python3 -I`), so a `json.py` or `json/` package in the repo being
+  audited, or a `PYTHONPATH` entry, cannot replace the standard library inside the
+  gate. `status` runs the hook file directly, as the harness does, so a hook that
+  lost its executable bit reports UNKNOWN instead of ON.
 - **Marker absence unprovable** (a directory on the marker path is not
   searchable): writes **denied**, even if `on` was never run. The hook cannot
   tell "no marker" from "cannot look", and an armed marker may sit below the

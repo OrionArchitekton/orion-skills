@@ -8,6 +8,20 @@ an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
 
 ### Fixed
 
+- `readonly` hook: a `json.py` (or `json/` package) in the session directory no
+  longer disables the gate. The harness runs hooks from the session directory and
+  `python3 -` put it first on the import path, so an audited repo carrying that file
+  turned an active marker into an allow and ran its own code on every edit attempt.
+  The hook and `readonly-mode.sh` now run python isolated (`-I`). A fail-closed
+  denial now prints the marker path and recovery commands on stderr instead of
+  blocking silently; `status` runs the hook file directly and reports UNKNOWN for a
+  hook the harness could not execute or start (exit 126/127). The hook no longer reads
+  stdin before deciding: the payload only decorates the deny message, so it is read
+  after the marker says deny, with a 1 s deadline and a 16 KiB cap, and the rest is
+  drained for at most 2 s. A caller that stalls mid-write, or never writes, cannot hold
+  the hook until the harness kills it, a large payload does not meet a closed pipe, and
+  no process outlives the hook. The self-test runs the hook file directly, as the
+  harness does.
 - `readonly` hook: a marker that is not a regular file (a named pipe, a device, a
   socket) or is larger than 64 KiB now denies immediately. Previously a named pipe or
   an endless device at the marker path made the hook hang until the harness killed it,
