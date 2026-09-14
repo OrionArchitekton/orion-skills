@@ -76,9 +76,12 @@ command -v python3 >/dev/null 2>&1 || exit 2
 # into a BLOCK even for a marker that says {"active": false}. Capping keeps the
 # decoration useful without letting payload size change the decision.
 INPUT=$(head -c 16384 2>/dev/null)
-# Drain the rest so a large Write payload never meets a closed pipe (EPIPE in the
-# harness writer could surface as a non-2 failure, which fails open).
-cat >/dev/null 2>&1
+# Drain the rest in the background so a large Write payload never meets a closed
+# pipe (EPIPE in the harness writer could surface as a non-2 failure, which fails
+# open), without waiting for the caller to finish writing: a stalled caller must
+# not hold the decision until the harness kills the hook. The explicit <&0 matters:
+# a background job in a non-interactive shell otherwise reads /dev/null.
+cat <&0 >/dev/null 2>&1 &
 
 # -I (isolated): the harness runs hooks from the session cwd, and plain `python3 -`
 # puts that directory first on sys.path, so a json.py in an audited repo would

@@ -235,8 +235,6 @@ class SelftestCliPath(unittest.TestCase):
         self.assertIn("must block", proc.stdout)
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class HookRunsIsolatedFromTheSessionCwd(unittest.TestCase):
@@ -286,3 +284,80 @@ class HookRunsIsolatedFromTheSessionCwd(unittest.TestCase):
                                   env=dict(os.environ, READONLY_MARKER=marker), timeout=30)
             self.assertNotEqual(0, proc.returncode, proc.stdout)
             self.assertNotIn("readonly: ON", proc.stdout)
+
+
+class HookNeverWaitsOnTheCaller(unittest.TestCase):
+    """The hook must decide on what it has read. Waiting for the caller to finish
+    writing (or leaving it writing into a closed pipe) is a way to get killed or
+    to fail the harness's write, and both let the edit run."""
+
+    HOOK = os.path.join(SKILL_DIR, "hooks", "pretooluse-readonly.sh")
+
+    def _active_marker(self, d):
+        marker = os.path.join(d, "readonly.json")
+        with open(marker, "w") as fh:
+            fh.write('{"active": true}')
+        return marker
+
+    def test_decides_while_a_large_payload_is_still_being_delivered(self):
+        with tempfile.TemporaryDirectory() as d:
+            env = dict(os.environ, READONLY_MARKER=self._active_marker(d))
+            proc = subprocess.Popen([self.HOOK], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                    stderr=subprocess.DEVNULL, env=env, start_new_session=True)
+            try:
+                proc.stdin.write(b'{"tool_name": "Write", "tool_input": {"content": "' + b"x" * 20000)
+                proc.stdin.flush()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    os.killpg(proc.pid, 9)
+                    self.fail("hook waited on an open stdin instead of deciding")
+                self.assertIn(b'"deny"', proc.stdout.read())
+            finally:
+                proc.stdin.close()
+                proc.stdout.close()
+
+    def test_a_large_payload_never_meets_a_closed_pipe(self):
+        import threading
+        with tempfile.TemporaryDirectory() as d:
+            env = dict(os.environ, READONLY_MARKER=self._active_marker(d))
+            proc = subprocess.Popen([self.HOOK], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                    stderr=subprocess.DEVNULL, env=env)
+            broken = []
+
+            def feed():
+                try:
+                    proc.stdin.write(b"x" * (1024 * 1024))
+                    proc.stdin.close()
+                except BrokenPipeError as e:
+                    broken.append(e)
+            writer = threading.Thread(target=feed)
+            writer.start()
+            out = proc.stdout.read()
+            proc.wait(timeout=10)
+            writer.join(timeout=10)
+            proc.stdout.close()
+            self.assertEqual([], broken, "the caller's write hit a closed pipe")
+            self.assertIn(b'"deny"', out)
+
+    def test_status_reports_unknown_when_the_hook_cannot_start(self):
+        import shutil
+        with tempfile.TemporaryDirectory() as d:
+            tree = os.path.join(d, "readonly")
+            shutil.copytree(SKILL_DIR, tree)
+            hook = os.path.join(tree, "hooks", "pretooluse-readonly.sh")
+            with open(hook) as fh:
+                body = fh.read().split("\n", 1)[1]
+            with open(hook, "w") as fh:
+                fh.write("#!/nonexistent/interpreter\n" + body)
+            os.chmod(hook, 0o755)
+            proc = subprocess.run(["bash", os.path.join(tree, "scripts", "readonly-mode.sh"), "status"],
+                                  capture_output=True, text=True,
+                                  env=dict(os.environ, READONLY_MARKER=self._active_marker(d)), timeout=30)
+            self.assertNotEqual(0, proc.returncode, proc.stdout)
+            self.assertNotIn("readonly: OFF", proc.stdout)
+            self.assertIn("UNKNOWN", proc.stdout + proc.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()

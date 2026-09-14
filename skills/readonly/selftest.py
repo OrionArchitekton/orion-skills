@@ -61,7 +61,7 @@ def fire(marker_path: str, event: str = SAMPLE_EVENT, cwd: str | None = None) ->
     # Own session so a hung hook's whole process group (bash AND its python3 child)
     # can be killed; killing only bash would orphan a child blocked on the marker.
     proc = subprocess.Popen(
-        ["bash", HOOK],
+        [HOOK],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

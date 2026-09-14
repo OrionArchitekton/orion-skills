@@ -74,6 +74,12 @@ marker_state() {
   if [ "$rc" -eq 2 ]; then
     return 2
   fi
+  if [ "$rc" -eq 126 ] || [ "$rc" -eq 127 ]; then
+    # The hook could not start (bad interpreter, noexec mount): the harness cannot
+    # run it either, so its answer is unknown, not "allowed by the marker".
+    echo "readonly: ERROR, the enforcement hook at $HOOK could not be started (exit $rc)" >&2
+    return 3
+  fi
   if [ "$rc" -ne 0 ]; then
     # Any other non-zero is fail-open at the harness, so the hook is NOT denying.
     return 1
