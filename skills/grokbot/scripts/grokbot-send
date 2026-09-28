@@ -18,6 +18,8 @@ Environment (read at call time; the URL and key are never printed or put on argv
   GROKBOT_OUTBOX_BOT_DIR   the same folder as the bot's local execution sees it
                            (default: GROKBOT_OUTBOX_DIR; under WSL set it to the Windows
                            path, e.g. C:\\Users\\<you>\\grokbot-outbox)
+  GROKBOT_STATE_DIR        where sent request ids are recorded, so each id is sent at most
+                           once from this machine (default ~/.local/state/grokbot/sent)
 Inject the URL and key from your secret manager (e.g. `<manager> run -- grokbot-send ...`).
 
 Usage:
@@ -26,9 +28,12 @@ Usage:
   grokbot-send --wait --timeout 1800 --context "weekly report" "..."
   grokbot-send --collect gb-20260927-231500-ab12cd34              # read a result later
   grokbot-send --json -- "--a task that starts with dashes"
-Exit codes: 0 ok | 2 usage | 3 missing or invalid config | 4 not sent, or refused with a 4xx or
-            redirect (no run started) | 5 no result yet (use --collect later) | 6 outcome
-            unknown (timeout, dropped reply, 5xx, 303): do NOT resend, collect it by id.
+Exit codes: 0 ok (HTTP 200) | 2 usage, or a request id already sent or answered |
+            3 missing or invalid config | 4 not sent, or refused with a 4xx: no run started,
+            safe to fix and resend | 5 accepted, but no result file within --timeout (or
+            --collect found none yet): the run may still be going, collect it later |
+            6 outcome unknown, no usable reply to the POST (timeout, dropped connection,
+            garbled reply, any 3xx, a 2xx other than 200, a 5xx): do NOT resend.
 """
 import datetime
 import http.client
@@ -55,6 +60,7 @@ POLL = 5.0
 SETTLE = 3.0
 MAX_RESULT_BYTES = 1024 * 1024
 EXIT_UNKNOWN = 6
+STATE_DIR_DEFAULT = "~/.local/state/grokbot/sent"
 REQUEST_ID_RE = re.compile(r"[A-Za-z0-9._-]{1,64}")
 LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 # C0/C1 controls (minus \t and \n) plus bidi overrides, which can disguise text in a terminal.
@@ -153,7 +159,7 @@ def check_webhook_url(url):
     try:
         parts = urllib.parse.urlsplit(url)
         host = parts.hostname
-        parts.port  # raises ValueError on a malformed port
+        _ = parts.port  # raises ValueError on a malformed port
     except ValueError:
         host, parts = None, None
     if parts is None or not host:
@@ -171,6 +177,46 @@ def outbox_paths(request_id):
     name = f"{request_id}.md"
     sep = "\\" if "\\" in bot else "/"
     return bot.rstrip("\\/") + sep + name, os.path.join(local, name)
+
+
+def _state_path(request_id):
+    base = os.path.expanduser(os.environ.get("GROKBOT_STATE_DIR") or STATE_DIR_DEFAULT)
+    return base, os.path.join(base, request_id)
+
+
+def claim_request_id(request_id):
+    """Record the id atomically before sending; an id already recorded is never sent again.
+
+    The webhook has no documented idempotency, so a second POST with the same id (a rerun
+    after a --wait timeout, or two concurrent calls) could start a second run whose result
+    lands in the same outbox file. O_EXCL makes the first caller the only one to send.
+    """
+    base, path = _state_path(request_id)
+    os.makedirs(base, mode=0o700, exist_ok=True)
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        die(2, f"request id {request_id} was already sent from this machine; "
+               f"use --collect {request_id} or a new id")
+    with os.fdopen(fd, "w") as f:
+        f.write(datetime.datetime.now().astimezone().isoformat(timespec="seconds") + "\n")
+
+
+def release_request_id(request_id):
+    """Forget an id whose POST provably started no run (exit 4), so it can be resent."""
+    try:
+        os.unlink(_state_path(request_id)[1])
+    except FileNotFoundError:
+        pass
+
+
+def redact(text, key):
+    """Remove the webhook key from text a server sent back (a proxy may reflect headers)."""
+    if not key:
+        return text
+    for form in {key, urllib.parse.quote(key, safe=""), urllib.parse.quote_plus(key)}:
+        text = text.replace(form, "[redacted]")
+    return text
 
 
 def build_body(opt):
@@ -290,17 +336,18 @@ def post(url, key, body):
             die(EXIT_UNKNOWN, f"outcome unknown for request_id={rid} ({type(e).__name__}): "
                               f"the task may be running. Do not resend; check later with "
                               f"`grokbot-send --collect {rid}` or the bot's chat.")
-        if status is not None and 200 <= status < 300:
+        if status == 200:
             return attempt, text
-        if status == 303 or (status is not None and 500 <= status < 600):
-            # A gateway error or a see-other can follow a request the origin already ran.
-            die(EXIT_UNKNOWN, f"outcome unknown for request_id={rid} (HTTP {status}): the task may "
-                              f"be running. Do not resend; check later with `grokbot-send --collect "
-                              f"{rid}` or the bot's chat.")
+        if status is not None and 400 <= status < 500:
+            die(4, f"webhook refused request_id={rid} with HTTP {status}; no run started. "
+                   f"{printable(redact(text, key)[:300])}".rstrip())
         if status is not None:
-            what = "a redirect (refused, not followed)" if 300 <= status < 400 else f"HTTP {status}"
-            die(4, f"webhook refused request_id={rid} with {what}; no run started. "
-                   f"{printable(text[:300])}".rstrip())
+            # Only 200 is documented as "run started". A redirect (never followed), a 2xx
+            # other than 200, or a 5xx reached a server without a clean answer.
+            what = "a redirect, not followed" if 300 <= status < 400 else f"HTTP {status}"
+            die(EXIT_UNKNOWN, f"outcome unknown for request_id={rid} ({what}): the task may be "
+                              f"running. Do not resend; check later with `grokbot-send --collect "
+                              f"{rid}` or the bot's chat.")
         if attempt >= MAX_ATTEMPTS or not should_retry(attempt, status, error):
             die(4, f"request_id={rid} was not sent ({type(error).__name__}: {error})")
         time.sleep(2 ** attempt)
@@ -338,9 +385,16 @@ def main():
         if os.path.lexists(local_path):
             die(2, f"request id {rid} already has a result; use --collect {rid} or a new id")
     body = build_body(opt)
-    attempts, text = post(url, key, body)
+    claim_request_id(rid)
+    try:
+        attempts, text = post(url, key, body)
+    except SystemExit as e:
+        if e.code in (3, 4):  # nothing was sent, or it was refused: no run started
+            release_request_id(rid)
+        raise
     if not opt["wait"]:
-        emit(opt, {"accepted": True, "request_id": rid, "attempts": attempts, "response": text[:500]},
+        emit(opt, {"accepted": True, "request_id": rid, "attempts": attempts,
+                   "response": redact(text, key)[:500]},
              f"accepted request_id={rid} (run started; the result posts in the bot's chat)")
         return
     print(f"accepted request_id={rid}; waiting up to {int(opt['timeout'])}s for the result",

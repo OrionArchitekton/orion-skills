@@ -74,8 +74,12 @@ python3 $S/grokbot-read show <bot> --grep <request_id>          # what the bot d
 ```
 
 - A 200 means the run STARTED. `--wait` is what proves it finished.
-- **Exit 6 means outcome unknown.** The task may be running. Collect it by request id or
-  read the chat; never resend it.
+- **Exit 5**: the POST was accepted, but no result file appeared within `--timeout`.
+  The run may still be going, so collect it later.
+- **Exit 6**: no usable reply to the POST, so the outcome is unknown. The task may be
+  running. Collect it by request id or read the chat; never resend it.
+- Each request id is sent at most once from this machine. A local ledger in
+  `GROKBOT_STATE_DIR` refuses a repeat, and the default generates a fresh id per task.
 - Write the task as a complete brief. The bot cannot see your conversation.
 - `grokbot-read` needs `GROKBOT_STORE` unless you are on native Windows. Its cache format is
   undocumented and may change with any app update.
@@ -100,11 +104,12 @@ python3 $S/grokbot-read show <bot> --grep <request_id>          # what the bot d
   3. Keep local execution off "Always allow" until then.
 - **No blind retries.** The webhook has no documented idempotency. `grokbot-send` never
   resends a request that might have reached the server. It reports "outcome unknown" (exit
-  6) instead, with the request id to collect.
+  6) instead, with the request id to collect: any reply other than a 200 or a 4xx counts.
+  It never sends the same request id twice from one machine.
 - **Bots share one computer, one set of logins, and one weekly usage allowance.** Separate
   bots are not a security boundary, and every run spends the same budget.
-- **The script checks its inputs.** It refuses webhook redirects and never forwards the key
-  to another host. Request ids must be `[A-Za-z0-9._-]{1,64}` because they become filenames.
+- **The script checks its inputs.** It refuses webhook redirects, never forwards the key
+  to another host, and redacts it from anything a server sends back. Request ids must be `[A-Za-z0-9._-]{1,64}` because they become filenames.
   Result files must be regular files and are size-capped. Terminal control characters are
   stripped before anything is printed.
 
@@ -140,7 +145,7 @@ Rules:
 |---|---|
 | "The webhook returned 200, so it's done." | 200 = run started. Only the outbox file or the chat reply proves completion. |
 | "No result yet, I'll send it again." | That starts a second run. `--collect` the first one. |
-| "It timed out, so it failed." | A timeout after sending is outcome-unknown (exit 6). The bot may be working. |
+| "It timed out, so it failed." | A `--wait` timeout (exit 5) means the run is still going; a timed-out POST (exit 6) means it may be. Collect, don't resend. |
 | "I'll put the key in the task so the bot can use it." | Keys go in the bot's per-bot Secrets, never in a task body or chat. |
 | "The bot said it posted/sent it, so it's fine." | Bots act as you. Public and outbound actions need a human decision first. |
 | "I'll just click the button in that other chat." | Other bots' pending cards may publish as you. Stay in your bot's chat. |

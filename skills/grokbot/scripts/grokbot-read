@@ -78,9 +78,24 @@ def _ts(row):
         return 0.0
 
 
+def _newest(blobs, suffix):
+    """The most recently written blob whose key ends with suffix (one per account slice)."""
+    keys = [k for k in blobs if k.endswith(suffix)]
+    if not keys:
+        return None
+
+    def mtime(k):
+        try:
+            return os.path.getmtime(blobs[k])
+        except OSError:
+            return 0.0
+
+    return max(keys, key=mtime)
+
+
 def roster(store):
     blobs = _blobs(store)
-    key = next((k for k in blobs if k.endswith(".roster.last-roster")), None)
+    key = _newest(blobs, ".roster.last-roster")
     if key is None:
         return []
     value = _load(blobs[key]) or {}
@@ -129,7 +144,7 @@ def _entry(e):
 def transcript(store, who):
     bot = resolve(store, who)
     blobs = _blobs(store)
-    key = next((k for k in blobs if k.endswith(f".transcript.replicas.{bot['id']}")), None)
+    key = _newest(blobs, f".transcript.replicas.{bot['id']}")
     if key is None:
         return []
     out = []
@@ -167,7 +182,7 @@ def main(argv):
         if as_json:
             print(json.dumps([{"name": r.get("name"), "id": r.get("id"), "updatedAt": r.get("updatedAt"),
                                "last": (r.get("lastEntry") if isinstance(r.get("lastEntry"), dict) else {}).get("text")}
-                              for r in rows], indent=2, ensure_ascii=False))
+                              for r in rows], indent=2))
             return
         for r in rows:
             entry = r.get("lastEntry") if isinstance(r.get("lastEntry"), dict) else {}
@@ -202,7 +217,7 @@ def main(argv):
         if last is not None:
             entries = entries[-last:]
         if as_json:
-            print(json.dumps(entries, indent=2, ensure_ascii=False))
+            print(json.dumps(entries, indent=2))
             return
         if not entries:
             print("(no cached entries; the app may not have written this chat yet)")

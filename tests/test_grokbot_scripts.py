@@ -15,6 +15,8 @@ from pathlib import Path
 from unittest import mock
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "skills" / "grokbot" / "scripts"
+# The sent-id ledger must never write to the real home directory during tests.
+os.environ.setdefault("GROKBOT_STATE_DIR", tempfile.mkdtemp(prefix="grokbot-test-state-"))
 
 
 def load(name):
@@ -192,6 +194,42 @@ class DeliveryProtocolTest(unittest.TestCase):
         self.assertEqual(ctx.exception.code, 5)
 
 
+    def test_a_request_id_is_sent_at_most_once_even_before_any_result(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {"GROKBOT_OUTBOX_DIR": tmp, "GROKBOT_STATE_DIR": tmp + "/state",
+                   "GROKBOT_WEBHOOK_URL": "https://example.invalid/h", "GROKBOT_WEBHOOK_KEY": "k"}
+            posts = []
+            with mock.patch.dict(os.environ, env), \
+                    mock.patch.object(gs, "post", side_effect=lambda *a: posts.append(a) or (1, "{}")), \
+                    mock.patch.object(gs, "wait_for_result", return_value=None):
+                with mock.patch("sys.argv", ["grokbot-send", "--request-id", "gb-once", "t"]):
+                    quiet(gs.main)
+                with mock.patch("sys.argv", ["grokbot-send", "--wait", "--request-id", "gb-once", "t"]), \
+                        self.assertRaises(SystemExit) as ctx:
+                    quiet(gs.main)
+        self.assertEqual(ctx.exception.code, 2)
+        self.assertEqual(len(posts), 1)
+
+
+    def test_json_output_redacts_a_reflected_key_and_refused_ids_can_be_resent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {"GROKBOT_STATE_DIR": tmp, "GROKBOT_WEBHOOK_URL": "https://example.invalid/h",
+                   "GROKBOT_WEBHOOK_KEY": "k-SECRET-888"}
+            out = io.StringIO()
+            with mock.patch.dict(os.environ, env), \
+                    mock.patch.object(gs, "post", return_value=(1, '{"echo": "Bearer k-SECRET-888"}')), \
+                    mock.patch("sys.argv", ["grokbot-send", "--json", "--request-id", "gb-j", "t"]), \
+                    redirect_stdout(out), redirect_stderr(io.StringIO()):
+                gs.main()
+            self.assertNotIn("SECRET-888", out.getvalue())
+            refused = mock.patch.object(gs, "post", side_effect=SystemExit(4))
+            with mock.patch.dict(os.environ, env), refused, \
+                    mock.patch("sys.argv", ["grokbot-send", "--request-id", "gb-k", "t"]), \
+                    self.assertRaises(SystemExit):
+                quiet(gs.main)
+            self.assertFalse(os.path.exists(os.path.join(tmp, "gb-k")), "a refused id is released")
+
+
 class WebhookUrlValidationTest(unittest.TestCase):
     def run_main(self, url):
         env = {"GROKBOT_WEBHOOK_URL": url, "GROKBOT_WEBHOOK_KEY": "gbk_SECRETVALUE123"}
@@ -281,8 +319,10 @@ class WebhookPostTest(unittest.TestCase):
         self.assertEqual(len(_Handler.seen), 1)
 
     def test_status_classification(self):
-        # 2xx = accepted; 4xx = refused (no run); 5xx and 303 = the origin may have run it.
-        for status, expected in ((202, 0), (204, 0), (404, 4), (401, 4), (302, 4),
+        # Only 200 is documented as "run started". A 4xx is refused (no run, safe to fix and
+        # resend). Anything else reached a server without a clean answer: outcome unknown.
+        for status, expected in ((200, 0), (404, 4), (401, 4), (202, gs.EXIT_UNKNOWN),
+                                 (204, gs.EXIT_UNKNOWN), (302, gs.EXIT_UNKNOWN), (307, gs.EXIT_UNKNOWN),
                                  (303, gs.EXIT_UNKNOWN), (502, gs.EXIT_UNKNOWN), (504, gs.EXIT_UNKNOWN)):
             _Handler.status = status
             _Handler.seen = []
@@ -295,6 +335,29 @@ class WebhookPostTest(unittest.TestCase):
                         quiet(gs.post, self.url, "k", {"task": "t", "request_id": "gb-s"})
                     self.assertEqual(ctx.exception.code, expected)
                 self.assertEqual(len(_Handler.seen), 1)
+
+    def test_an_error_body_that_reflects_the_key_is_redacted(self):
+        class Reflect(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                self.rfile.read(int(self.headers.get("Content-Length", 0)))
+                self.send_response(401)
+                self.end_headers()
+                self.wfile.write(("bad auth: " + self.headers.get("Authorization", "")).encode())
+
+            def log_message(self, *args):
+                pass
+
+        srv = http.server.HTTPServer(("127.0.0.1", 0), Reflect)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        err = io.StringIO()
+        try:
+            with redirect_stdout(io.StringIO()), redirect_stderr(err), self.assertRaises(SystemExit):
+                gs.post(f"http://127.0.0.1:{srv.server_address[1]}/hook", "k-SECRET-777",
+                        {"task": "t", "request_id": "gb-r"})
+        finally:
+            srv.shutdown()
+            srv.server_close()
+        self.assertNotIn("SECRET-777", err.getvalue())
 
     def test_a_lost_response_is_outcome_unknown_and_names_the_request_id(self):
         class Slow(http.server.BaseHTTPRequestHandler):
@@ -386,7 +449,7 @@ class WebhookPostTest(unittest.TestCase):
             with self.assertRaises(SystemExit) as ctx:
                 quiet(gs.post, f"http://127.0.0.1:{first.server_address[1]}/hook", "k-9",
                       {"task": "t", "request_id": "gb-1"})
-            self.assertEqual(ctx.exception.code, 4)
+            self.assertEqual(ctx.exception.code, gs.EXIT_UNKNOWN)
             self.assertEqual(reached, [])
         finally:
             for srv in (first, other):
@@ -451,6 +514,26 @@ class CacheReaderTest(unittest.TestCase):
                 self.assertRaises(SystemExit) as ctx:
             rd.main(list(argv))
         return ctx.exception.code
+
+    def test_json_output_escapes_control_and_bidi_characters(self):
+        acct = "sand.client.slice.account.example%7Cuser_X"
+        tr_path = Path(self.store) / blob_name(f"{acct}.transcript.replicas.aaaa1111-0000")
+        tr = json.loads(tr_path.read_text())
+        tr["value"]["entries"].append({"kind": "send-message", "message": {"content": "safe\u202etxt\x1b[2J"}})
+        tr_path.write_text(json.dumps(tr))
+        out = io.StringIO()
+        with mock.patch.dict(os.environ, {"GROKBOT_STORE": self.store}), redirect_stdout(out):
+            rd.main(["show", "helper", "--json"])
+        self.assertNotIn("\u202e", out.getvalue())
+        self.assertNotIn("\x1b", out.getvalue())
+        self.assertIn("safe", out.getvalue())
+
+    def test_the_newest_account_slice_wins_when_several_exist(self):
+        old_acct = "sand.client.slice.account.example%7Cuser_OLD"
+        path = Path(self.store) / blob_name(f"{old_acct}.roster.last-roster")
+        path.write_text(json.dumps({"value": {"rows": [{"id": "old-1", "name": "Stale", "updatedAt": 1}]}}))
+        os.utime(path, (1, 1))
+        self.assertEqual([r["name"] for r in rd.roster(self.store)], ["Helper", "Other"])
 
     def test_bad_flags_are_usage_errors_not_tracebacks(self):
         for argv in (("show", "helper", "--grep"), ("show", "helper", "--last", "x"),
