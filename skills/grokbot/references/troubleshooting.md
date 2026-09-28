@@ -27,6 +27,8 @@ started no run (exit 3 or 4). The ledger is per machine: don't reuse ids across 
 - Check the paths. `GROKBOT_OUTBOX_BOT_DIR` must be the folder as the APP sees it: a
   Windows path when the app runs on Windows and your agent runs in WSL.
 - Read what the bot did: `grokbot-read show <bot> --grep <request_id>`.
+- The bot is asked to write `<request_id>.md.tmp` and rename it when complete, so a
+  half-written result is never read. A lingering `.tmp` file means the write stalled.
 
 ## After a restart
 

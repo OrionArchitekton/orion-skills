@@ -104,6 +104,12 @@ class DeliveryProtocolTest(unittest.TestCase):
         self.assertTrue(body["task"].startswith("t"))
         self.assertEqual(body["context"], "c")
 
+    def test_wait_body_asks_for_an_atomic_publish(self):
+        body = gs.build_body({"task": "t", "context": None, "request_id": "gb-a", "wait": True})
+        bot_path, _ = gs.outbox_paths("gb-a")
+        self.assertIn(bot_path + ".tmp", body["task"])
+        self.assertIn("rename", body["task"].lower())
+
     def test_single_machine_uses_one_folder(self):
         with mock.patch.dict(os.environ, {"GROKBOT_OUTBOX_DIR": "/tmp/out"}):
             os.environ.pop("GROKBOT_OUTBOX_BOT_DIR", None)
@@ -422,6 +428,27 @@ class WebhookPostTest(unittest.TestCase):
                 quiet(gs.post, "https://example.invalid/h", "k", {"task": "t", "request_id": "gb-t"})
             self.assertEqual(ctx.exception.code, expected)
 
+    def test_the_response_read_is_bounded(self):
+        class Huge(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                self.rfile.read(int(self.headers.get("Content-Length", 0)))
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"x" * (gs.MAX_RESPONSE_BYTES * 4))
+
+            def log_message(self, *args):
+                pass
+
+        srv = http.server.HTTPServer(("127.0.0.1", 0), Huge)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            _, text = gs.post(f"http://127.0.0.1:{srv.server_address[1]}/hook", "k",
+                              {"task": "t", "request_id": "gb-h"})
+        finally:
+            srv.shutdown()
+            srv.server_close()
+        self.assertLessEqual(len(text), gs.MAX_RESPONSE_BYTES)
+
     def test_a_lost_response_is_outcome_unknown_and_names_the_request_id(self):
         class Slow(http.server.BaseHTTPRequestHandler):
             def do_POST(self):
@@ -617,6 +644,23 @@ class CacheReaderTest(unittest.TestCase):
         os.mkfifo(Path(self.store) / blob_name(f"{acct}.transcript.replicas.aaaa1111-0000"))
         self.assertEqual([r["name"] for r in rd.roster(self.store)], ["Helper", "Other"])
         self.assertEqual(len(rd.transcript(self.store, "helper")), 3)
+
+    def test_ids_and_roles_are_sanitized_in_human_output(self):
+        acct = "sand.client.slice.account.example%7Cuser_X"
+        path = Path(self.store) / blob_name(f"{acct}.roster.last-roster")
+        data = json.loads(path.read_text())
+        data["value"]["rows"].append({"id": "ffff\x1b[2J", "name": "Esc", "updatedAt": 9e12})
+        path.write_text(json.dumps(data))
+        tr_path = Path(self.store) / blob_name(f"{acct}.transcript.replicas.aaaa1111-0000")
+        tr = json.loads(tr_path.read_text())
+        tr["value"]["entries"].append({"kind": "message", "role": "\x1b]0;x\x07evil", "content": "hi"})
+        tr_path.write_text(json.dumps(tr))
+        for argv in (("list",), ("show", "helper")):
+            out = io.StringIO()
+            with self.subTest(argv=argv), mock.patch.dict(os.environ, {"GROKBOT_STORE": self.store}), \
+                    redirect_stdout(out):
+                rd.main(list(argv))
+            self.assertNotRegex(out.getvalue(), "[\x1b\x07]")
 
     def test_bad_flags_are_usage_errors_not_tracebacks(self):
         for argv in (("show", "helper", "--grep"), ("show", "helper", "--last", "x"),

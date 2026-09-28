@@ -63,6 +63,7 @@ DEFAULT_WAIT = 600
 POLL = 5.0
 SETTLE = 3.0
 MAX_RESULT_BYTES = 1024 * 1024
+MAX_RESPONSE_BYTES = 64 * 1024  # the body is never printed; read only enough to finish cleanly
 EXIT_UNKNOWN = 6
 STATE_DIR_DEFAULT = "~/.local/state/grokbot/sent"
 REQUEST_ID_RE = re.compile(r"[A-Za-z0-9._-]{1,64}")
@@ -223,9 +224,9 @@ def build_body(opt):
         body["deliver_to"] = bot_path
         body["task"] = (
             f"{opt['task']}\n\nWhen finished, write your final result as Markdown to "
-            f"{bot_path} on the computer running the Grok Bot desktop app, using Execution "
-            f"on Local Computer (not your cloud computer). Write it complete in one step. "
-            f"Also reply in chat as usual."
+            f"{bot_path}.tmp on the computer running the Grok Bot desktop app, using Execution "
+            f"on Local Computer (not your cloud computer). Only after that write is complete, "
+            f"rename it to {bot_path}. Also reply in chat as usual."
         )
     return body
 
@@ -322,11 +323,11 @@ def post(url, key, body):
         status, text, error = None, "", None
         try:
             with opener.open(req, timeout=TIMEOUT) as resp:
-                status, text = resp.status, resp.read().decode("utf-8", "replace")
+                status, text = resp.status, resp.read(MAX_RESPONSE_BYTES).decode("utf-8", "replace")
         except urllib.error.HTTPError as e:
             status = e.code
             try:
-                text = e.read().decode("utf-8", "replace")
+                text = e.read(MAX_RESPONSE_BYTES).decode("utf-8", "replace")
             except Exception:
                 text = ""
         except urllib.error.URLError as e:

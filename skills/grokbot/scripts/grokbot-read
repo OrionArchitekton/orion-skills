@@ -205,7 +205,8 @@ def main(argv):
             entry = r.get("lastEntry") if isinstance(r.get("lastEntry"), dict) else {}
             last = printable(entry.get("text") or "").replace("\n", " ")[:80]
             name = printable(r.get("name") or "")
-            print(f"{str(r.get('id') or '')[:8]}  {_fmt_ts(_ts(r))}  {name:<22} {last}")
+            rid = printable(str(r.get("id") or ""))[:8]
+            print(f"{rid}  {_fmt_ts(_ts(r))}  {name:<22} {last}")
         return
     if argv[0] == "show" and len(argv) > 1:
         grep, last = None, None
@@ -239,7 +240,7 @@ def main(argv):
         if not entries:
             print("(no cached entries; the app may not have written this chat yet)")
         for e in entries:
-            print(f"[{_fmt_ts(e['ts'])}] {e['role'].upper()}: {printable(e['text'])}\n")
+            print(f"[{_fmt_ts(e['ts'])}] {printable(e['role']).upper()}: {printable(e['text'])}\n")
         return
     print(__doc__)
     sys.exit(2)
