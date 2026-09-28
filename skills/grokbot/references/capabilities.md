@@ -38,6 +38,7 @@ Sources: 20 docs.x.ai/grok-bot pages (full sitemap set) and 17 cursor.com Grok B
 - GitHub, Linear, Sentry, PagerDuty and email triggers are only named as event sources. Their setup, filters and payload are not documented. These are "Cursor account integrations" and are separate from plugins. https://cursor.com/help/grok-bot/routines
 - **Webhook contract (the complete documented contract):** HTTP `POST` to the routine's "POST to" URL, with header `Authorization: Bearer <key>` and an optional JSON body. The Bot receives the body together with the routine instruction. https://cursor.com/help/grok-bot/routines
 - Webhook response: `200` means the call was accepted and a run started, not that the run finished. Any other response means no run started. Results appear in the Bot's chat, not in a callback. https://cursor.com/help/grok-bot/routines
+  - Note: `grokbot-send` is stricter than this. It treats only a 4xx as "no run", and reports a redirect, a 2xx other than 200, or a 5xx as outcome unknown, because a proxy or gateway in between can answer after forwarding.
 - Not documented for webhooks: key rotation, rate limits, body size limit, retries or idempotency, a response body, or payload/event schemas for the other triggers. https://cursor.com/help/grok-bot/routines
 
 ## 3. Local computer access

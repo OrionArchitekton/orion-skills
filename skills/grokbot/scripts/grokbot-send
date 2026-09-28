@@ -4,7 +4,10 @@
 Grok Bot (xAI's desktop app; bots run in a cloud computer) has no public API for driving
 bots. The documented inbound path is a routine with a Webhook trigger: POST JSON to the
 routine URL with `Authorization: Bearer <key>`. A 200 means Grok Bot ACCEPTED the call
-and started a run, NOT that the bot finished. Any other response means no run started.
+and started a run, NOT that the bot finished. The docs say any other response means no
+run started; this script is stricter: only a 4xx counts as "no run" (a proxy or gateway in
+between can answer after forwarding), so anything else is reported as outcome unknown.
+Nothing the server sends back is ever printed: a reply could echo the key.
 
 Return channel (--wait): the task tells the bot to write its final result, through the
 desktop app's local execution, to <GROKBOT_OUTBOX_BOT_DIR>/<request_id>.md on the machine
@@ -36,6 +39,7 @@ Exit codes: 0 ok (HTTP 200) | 2 usage, or a request id already sent or answered 
             garbled reply, any 3xx, a 2xx other than 200, a 5xx): do NOT resend.
 """
 import datetime
+import errno
 import http.client
 import json
 import math
@@ -210,15 +214,6 @@ def release_request_id(request_id):
         pass
 
 
-def redact(text, key):
-    """Remove the webhook key from text a server sent back (a proxy may reflect headers)."""
-    if not key:
-        return text
-    for form in {key, urllib.parse.quote(key, safe=""), urllib.parse.quote_plus(key)}:
-        text = text.replace(form, "[redacted]")
-    return text
-
-
 def build_body(opt):
     body = {"task": opt["task"], "request_id": opt["request_id"]}
     if opt.get("context"):
@@ -236,12 +231,17 @@ def build_body(opt):
 
 
 def _read_result(path):
-    """Text of a regular (non-symlink) file, capped at MAX_RESULT_BYTES; None otherwise."""
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    """Text of a regular (non-symlink) file, capped at MAX_RESULT_BYTES; None if the path is
+    missing or not a regular file. Other OSErrors (a writer's lock) propagate to the caller."""
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
     try:
         fd = os.open(path, flags)
-    except OSError:
+    except FileNotFoundError:
         return None
+    except OSError as e:
+        if e.errno in (errno.ELOOP, errno.ENXIO):  # a symlink (O_NOFOLLOW) or a FIFO
+            return None
+        raise
     with os.fdopen(fd, "rb") as f:
         if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
             return None
@@ -273,7 +273,13 @@ def wait_for_result(path, timeout=DEFAULT_WAIT, poll=POLL, settle=SETTLE):
             if stable_since is None:
                 stable_since = time.monotonic()
             if time.monotonic() - stable_since >= settle:
-                return _read_result(path)
+                try:
+                    text = _read_result(path)
+                except OSError:
+                    text = None  # e.g. still locked by the writer on Windows: keep waiting
+                if text is not None:
+                    return text
+                stable_since = None
         else:
             stable_since = None
         last = sig
@@ -297,8 +303,10 @@ class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
 
 
 def _not_sent(reason):
-    """True when the failure happened before any request bytes could reach the server."""
-    return isinstance(reason, (ConnectionRefusedError, socket.gaierror, ssl.SSLError))
+    """True only when the failure provably happened before any request bytes left: a refused
+    connection, a DNS failure, or a certificate rejected during the TLS handshake. Any other
+    TLS error can happen while the request is being written, so it is not proof."""
+    return isinstance(reason, (ConnectionRefusedError, socket.gaierror, ssl.SSLCertVerificationError))
 
 
 def post(url, key, body):
@@ -322,7 +330,9 @@ def post(url, key, body):
             except Exception:
                 text = ""
         except urllib.error.URLError as e:
-            if isinstance(e.reason, (ValueError, http.client.InvalidURL)):
+            # Checked first: a certificate failure is also a ValueError, but it is a network
+            # outcome (nothing sent), not a bad config value.
+            if not _not_sent(e.reason) and isinstance(e.reason, (ValueError, http.client.InvalidURL)):
                 die(3, f"{URL_VAR} could not be used ({type(e.reason).__name__}); value not shown")
             if not _not_sent(e.reason):
                 die(EXIT_UNKNOWN, f"outcome unknown for request_id={rid} ({type(e.reason).__name__}): "
@@ -339,8 +349,8 @@ def post(url, key, body):
         if status == 200:
             return attempt, text
         if status is not None and 400 <= status < 500:
-            die(4, f"webhook refused request_id={rid} with HTTP {status}; no run started. "
-                   f"{printable(redact(text, key)[:300])}".rstrip())
+            die(4, f"webhook refused request_id={rid} with HTTP {status}; no run started "
+                   f"(response body not shown)")
         if status is not None:
             # Only 200 is documented as "run started". A redirect (never followed), a 2xx
             # other than 200, or a 5xx reached a server without a clean answer.
@@ -393,8 +403,7 @@ def main():
             release_request_id(rid)
         raise
     if not opt["wait"]:
-        emit(opt, {"accepted": True, "request_id": rid, "attempts": attempts,
-                   "response": redact(text, key)[:500]},
+        emit(opt, {"accepted": True, "request_id": rid, "attempts": attempts},
              f"accepted request_id={rid} (run started; the result posts in the bot's chat)")
         return
     print(f"accepted request_id={rid}; waiting up to {int(opt['timeout'])}s for the result",

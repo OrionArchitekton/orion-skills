@@ -21,6 +21,7 @@ Usage:
   grokbot-read show <bot name | id prefix> [--grep TEXT] [--last N] [--json]
 """
 import base64
+import stat
 import datetime
 import glob
 import json
@@ -51,22 +52,34 @@ def decode_name(fname):
     return base64.b32decode(stem).decode("utf-8", "replace")
 
 
+MAX_BLOB_BYTES = 64 * 1024 * 1024
+
+
 def _blobs(store):
+    """Decoded key -> path, for regular files only (a symlink or FIFO is ignored)."""
     out = {}
     for f in glob.glob(os.path.join(store, "*.blob")):
         try:
+            if not stat.S_ISREG(os.lstat(f).st_mode):
+                continue
             out[decode_name(f)] = f
-        except (ValueError, UnicodeDecodeError):
+        except (OSError, ValueError, UnicodeDecodeError):
             continue
     return out
 
 
 def _load(path):
-    """The blob's value, or None when it is unreadable or partially written."""
+    """The blob's value, or None when it is unreadable, oversized, not a regular file, or
+    partially written. Opened without following symlinks and without blocking on a FIFO."""
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
     try:
-        with open(path, encoding="utf-8") as f:
-            value = json.load(f)["value"]
-    except (OSError, ValueError, KeyError, TypeError):
+        fd = os.open(path, flags)
+        with os.fdopen(fd, "rb") as f:
+            st = os.fstat(f.fileno())
+            if not stat.S_ISREG(st.st_mode) or st.st_size > MAX_BLOB_BYTES:
+                return None
+            value = json.loads(f.read(MAX_BLOB_BYTES + 1).decode("utf-8"))["value"]
+    except (OSError, ValueError, KeyError, TypeError, UnicodeDecodeError):
         return None
     return value if isinstance(value, dict) else None
 
@@ -86,7 +99,7 @@ def _newest(blobs, suffix):
 
     def mtime(k):
         try:
-            return os.path.getmtime(blobs[k])
+            return os.lstat(blobs[k]).st_mtime
         except OSError:
             return 0.0
 
@@ -100,16 +113,20 @@ def roster(store):
         return []
     value = _load(blobs[key]) or {}
     rows = value.get("rows")
-    rows = [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+    # A row needs a usable id: transcripts are looked up by it.
+    rows = ([r for r in rows if isinstance(r, dict) and isinstance(r.get("id"), str) and r["id"]]
+            if isinstance(rows, list) else [])
     return sorted(rows, key=_ts, reverse=True)
 
 
 def resolve(store, who):
     rows = roster(store)
     w = who.lower()
-    for r in rows:
-        if str(r.get("name") or "").lower() == w:
-            return r
+    named = [r for r in rows if str(r.get("name") or "").lower() == w]
+    if len(named) > 1:
+        raise LookupError(f"{who!r} is ambiguous; use an id prefix: {[r['id'][:8] for r in named]}")
+    if named:
+        return named[0]
     hits = [r for r in rows if str(r.get("id") or "").startswith(who)]
     if len(hits) == 1:
         return hits[0]

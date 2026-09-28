@@ -109,7 +109,7 @@ python3 $S/grokbot-read show <bot> --grep <request_id>          # what the bot d
 - **Bots share one computer, one set of logins, and one weekly usage allowance.** Separate
   bots are not a security boundary, and every run spends the same budget.
 - **The script checks its inputs.** It refuses webhook redirects, never forwards the key
-  to another host, and redacts it from anything a server sends back. Request ids must be `[A-Za-z0-9._-]{1,64}` because they become filenames.
+  to another host, and never prints anything a server sends back (a reply could echo it). Request ids must be `[A-Za-z0-9._-]{1,64}` because they become filenames.
   Result files must be regular files and are size-capped. Terminal control characters are
   stripped before anything is printed.
 

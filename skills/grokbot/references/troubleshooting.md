@@ -7,7 +7,7 @@
 | 0 | Accepted (and with `--wait`, the result arrived) | Nothing. |
 | 2 | Usage error, or a request id that was already sent from this machine or already has a result | Fix the arguments, or `--collect` that id, or pick a new id. |
 | 3 | Missing or invalid config: URL or key unset; URL not https, malformed, or carrying credentials; key with whitespace (often a trailing newline from copy-paste); or `GROKBOT_OUTBOX_DIR` missing | Fix the environment. Neither value is ever echoed. |
-| 4 | Not sent (DNS failure, refused connection, TLS failure), or refused by the webhook with a 4xx | No run started, so it is safe to fix and resend (the id is released). A 401 or 404 usually means the webhook trigger was deleted or replaced. Add a new trigger and update the secrets. |
+| 4 | Not sent (DNS failure, refused connection, TLS failure), or refused by the webhook with a 4xx (the response body is never shown) | No run started, so it is safe to fix and resend (the id is released). A 401 or 404 usually means the webhook trigger was deleted or replaced. Add a new trigger and update the secrets. |
 | 5 | Accepted (HTTP 200), but no result file within `--timeout`; or `--collect` found nothing yet, or a file still being written | The run may still be going: `grokbot-send --collect <request_id>` later. |
 | 6 | **Outcome unknown**: the request may have reached Grok Bot, but no usable reply arrived (a timed-out POST, dropped connection, garbled response, any redirect, a 2xx other than 200, or a 5xx) | **Do not resend.** `--collect <request_id>`, or `grokbot-read show <bot> --grep <request_id>`. |
 

@@ -211,6 +211,33 @@ class DeliveryProtocolTest(unittest.TestCase):
         self.assertEqual(len(posts), 1)
 
 
+    def test_an_outcome_unknown_send_keeps_its_id_recorded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {"GROKBOT_STATE_DIR": tmp, "GROKBOT_WEBHOOK_URL": "https://example.invalid/h",
+                   "GROKBOT_WEBHOOK_KEY": "k"}
+            with mock.patch.dict(os.environ, env), mock.patch.object(gs, "post", side_effect=SystemExit(6)), \
+                    mock.patch("sys.argv", ["grokbot-send", "--request-id", "gb-u", "t"]), \
+                    self.assertRaises(SystemExit):
+                quiet(gs.main)
+            self.assertTrue(os.path.exists(os.path.join(tmp, "gb-u")), "an id that may have run stays recorded")
+
+    def test_wait_keeps_polling_through_a_transient_read_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "gb-w.md"
+            target.write_text("done")
+            calls = {"n": 0}
+            real = gs._read_result
+
+            def flaky(path):
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    raise PermissionError("locked by the writer")
+                return real(path)
+
+            with mock.patch.object(gs, "_read_result", side_effect=flaky):
+                got = gs.wait_for_result(str(target), timeout=3, poll=0.1, settle=0.1)
+        self.assertEqual(got, "done")
+
     def test_json_output_redacts_a_reflected_key_and_refused_ids_can_be_resent(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = {"GROKBOT_STATE_DIR": tmp, "GROKBOT_WEBHOOK_URL": "https://example.invalid/h",
@@ -358,6 +385,42 @@ class WebhookPostTest(unittest.TestCase):
             srv.shutdown()
             srv.server_close()
         self.assertNotIn("SECRET-777", err.getvalue())
+
+    def test_the_error_body_is_never_printed(self):
+        class Body(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                self.rfile.read(int(self.headers.get("Content-Length", 0)))
+                self.send_response(403)
+                self.end_headers()
+                self.wfile.write(b'{"echo": "BODY-MARKER-555"}')
+
+            def log_message(self, *args):
+                pass
+
+        srv = http.server.HTTPServer(("127.0.0.1", 0), Body)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        out, err = io.StringIO(), io.StringIO()
+        try:
+            with redirect_stdout(out), redirect_stderr(err), self.assertRaises(SystemExit):
+                gs.post(f"http://127.0.0.1:{srv.server_address[1]}/hook", "k", {"task": "t", "request_id": "gb-b"})
+        finally:
+            srv.shutdown()
+            srv.server_close()
+        self.assertNotIn("BODY-MARKER-555", out.getvalue() + err.getvalue())
+
+    def test_only_a_certificate_failure_counts_as_not_sent_among_tls_errors(self):
+        import ssl
+        import urllib.error
+        for reason, expected in ((ssl.SSLCertVerificationError("bad cert"), 4),
+                                 (ssl.SSLEOFError("eof during write"), gs.EXIT_UNKNOWN),
+                                 (ssl.SSLError("write failed"), gs.EXIT_UNKNOWN)):
+            opener = mock.Mock()
+            opener.open.side_effect = urllib.error.URLError(reason)
+            with self.subTest(reason=type(reason).__name__), \
+                    mock.patch.object(gs.urllib.request, "build_opener", return_value=opener), \
+                    self.assertRaises(SystemExit) as ctx:
+                quiet(gs.post, "https://example.invalid/h", "k", {"task": "t", "request_id": "gb-t"})
+            self.assertEqual(ctx.exception.code, expected)
 
     def test_a_lost_response_is_outcome_unknown_and_names_the_request_id(self):
         class Slow(http.server.BaseHTTPRequestHandler):
@@ -535,6 +598,26 @@ class CacheReaderTest(unittest.TestCase):
         os.utime(path, (1, 1))
         self.assertEqual([r["name"] for r in rd.roster(self.store)], ["Helper", "Other"])
 
+    def test_an_ambiguous_name_is_an_error_not_a_guess(self):
+        acct = "sand.client.slice.account.example%7Cuser_X"
+        path = Path(self.store) / blob_name(f"{acct}.roster.last-roster")
+        data = json.loads(path.read_text())
+        data["value"]["rows"].append({"id": "eeee5555-0000", "name": "HELPER", "updatedAt": 1})
+        path.write_text(json.dumps(data))
+        with self.assertRaisesRegex(LookupError, "ambiguous"):
+            rd.resolve(self.store, "helper")
+        self.assertEqual(rd.resolve(self.store, "eeee")["id"], "eeee5555-0000")
+
+    def test_symlinked_or_fifo_blobs_are_ignored(self):
+        acct = "sand.client.slice.account.example%7Cuser_Z"
+        decoy = Path(self.tmp.name) / "decoy.json"
+        decoy.write_text(json.dumps({"value": {"rows": [{"id": "zzzz", "name": "Decoy"}]}}))
+        link = Path(self.store) / blob_name(f"{acct}.roster.last-roster")
+        link.symlink_to(decoy)
+        os.mkfifo(Path(self.store) / blob_name(f"{acct}.transcript.replicas.aaaa1111-0000"))
+        self.assertEqual([r["name"] for r in rd.roster(self.store)], ["Helper", "Other"])
+        self.assertEqual(len(rd.transcript(self.store, "helper")), 3)
+
     def test_bad_flags_are_usage_errors_not_tracebacks(self):
         for argv in (("show", "helper", "--grep"), ("show", "helper", "--last", "x"),
                      ("show", "helper", "--last", "0"), ("show", "helper", "--last", "-1")):
@@ -567,6 +650,16 @@ class CacheReaderTest(unittest.TestCase):
         self.assertEqual(rd.roster(self.store), [])
         tr["value"]["entries"] = None
         tr_path.write_text(json.dumps(tr))
+
+    def test_roster_rows_without_an_id_are_excluded(self):
+        acct = "sand.client.slice.account.example%7Cuser_X"
+        path = Path(self.store) / blob_name(f"{acct}.roster.last-roster")
+        data = json.loads(path.read_text())
+        data["value"]["rows"] += [{"name": "Ghost", "updatedAt": 5}, {"id": "", "name": "Blank"}]
+        path.write_text(json.dumps(data))
+        self.assertNotIn("Ghost", [r.get("name") for r in rd.roster(self.store)])
+        with self.assertRaises(LookupError):
+            rd.transcript(self.store, "ghost")
 
     def test_roster_tolerates_missing_names_and_mixed_timestamps(self):
         acct = "sand.client.slice.account.example%7Cuser_X"
