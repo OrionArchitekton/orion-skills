@@ -149,6 +149,7 @@ validated as a Codex set.
 | [`office-hours`](skills/office-hours/SKILL.md) | Product-ideation partner: startup mode pushes six forcing questions until "everyone wants this" becomes a named customer with real demand evidence; builder mode is an enthusiastic riff partner for side projects. Both modes end in a reviewed design doc and one concrete next action, never in code. | You have an idea you haven't validated yet, or you're asked "is this worth building". |
 | [`design-consultation`](skills/design-consultation/SKILL.md) | Proposes a complete, coherent design system (aesthetic, typography, color, layout, spacing, motion) as one package, not a menu, with an explicit safe-choices-vs-risks breakdown, then generates a working HTML preview page and writes DESIGN.md as the project's source of truth. | Starting a new project's UI with no DESIGN.md yet, or asked for "design system" / "brand guidelines". |
 | [`delegate`](skills/delegate/SKILL.md) | Hands a scoped subagent, bulk, or background task to a non-Anthropic model CLI (Codex on a ChatGPT plan, Grok on a metered xAI key, or a free local model via Ollama) so it runs off the Anthropic budget with that vendor's native tool calling, behind a sandbox and env-scrub gate. Shells out to each vendor's own CLI; it is not an `ANTHROPIC_BASE_URL` router-proxy (a proxy corrupts tool calls). | You want subagent/workflow fan-out to run on another model off your Anthropic allocation, without the router-proxy tool-calling trap. |
+| [`grokbot`](skills/grokbot/SKILL.md) | Hands a task to a bot in xAI's Grok Bot desktop app through the documented routine webhook, and gets the result back through an outbox file the bot writes with the app's local execution, so no UI is touched. Also reads any bot's chat from the app's local cache. Never resends a task that might already be running (it reports the outcome as unknown instead), refuses webhook redirects, rejects path-like request ids, and spells out the webhook-key plus local-execution trade-off. | Work needs an always-on bot with its own logged-in browser, a schedule, or your connected apps, and you want the result back in your coding session. |
 
 ### Worked examples (one per skill)
 
@@ -266,6 +267,11 @@ validated as a Codex set.
   no sandbox-bypass flags, a whitelist env-scrub, an absolute-path CLI resolve, and a
   read-only default. A proxy under `ANTHROPIC_BASE_URL` is avoided on purpose; it corrupts
   tool calls.
+- **`grokbot`**: "Have the research bot list this week's three biggest changes on the
+  competitor's pricing page." `grokbot-send --wait` posts the brief to the bot's routine webhook,
+  the bot browses from its cloud computer and writes its answer to the outbox folder through the
+  desktop app, and the agent prints it about 30 seconds later. A 200 only means the run started;
+  the outbox file is the proof it finished, and a timeout is collected later rather than re-sent.
 
 ## Authoring conventions
 

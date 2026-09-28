@@ -1,0 +1,420 @@
+#!/usr/bin/env python3
+"""grokbot-send - hand a task to a Grok Bot bot through a routine's webhook trigger.
+
+Grok Bot (xAI's desktop app; bots run in a cloud computer) has no public API for driving
+bots. The documented inbound path is a routine with a Webhook trigger: POST JSON to the
+routine URL with `Authorization: Bearer <key>`. A 200 means Grok Bot ACCEPTED the call
+and started a run, NOT that the bot finished. The docs say any other response means no
+run started; this script is stricter: only a 4xx counts as "no run" (a proxy or gateway in
+between can answer after forwarding), so anything else is reported as outcome unknown.
+Nothing the server sends back is ever printed: a reply could echo the key.
+
+Return channel (--wait): the task tells the bot to write its final result, through the
+desktop app's local execution, to <GROKBOT_OUTBOX_BOT_DIR>/<request_id>.md on the machine
+running the app. This process polls the same file at <GROKBOT_OUTBOX_DIR>/<request_id>.md,
+so no UI is touched.
+
+Environment (read at call time; the URL and key are never printed or put on argv):
+  GROKBOT_WEBHOOK_URL      the routine's "POST to" URL (https)    (required to send)
+  GROKBOT_WEBHOOK_KEY      the routine's webhook key              (required to send)
+  GROKBOT_OUTBOX_DIR       where THIS process reads results       (default ~/grokbot-outbox)
+  GROKBOT_OUTBOX_BOT_DIR   the same folder as the bot's local execution sees it
+                           (default: GROKBOT_OUTBOX_DIR; under WSL set it to the Windows
+                           path, e.g. C:\\Users\\<you>\\grokbot-outbox)
+  GROKBOT_STATE_DIR        where sent request ids are recorded, so each id is sent at most
+                           once from this machine (default ~/.local/state/grokbot/sent)
+Inject the URL and key from your secret manager (e.g. `<manager> run -- grokbot-send ...`).
+
+Usage:
+  grokbot-send "check whether https://example.com returns 200"   # fire and forget
+  grokbot-send --wait "summarize the top 3 posts on <forum>"      # block until result
+  grokbot-send --wait --timeout 1800 --context "weekly report" "..."
+  grokbot-send --collect gb-20260927-231500-ab12cd34              # read a result later
+  grokbot-send --json -- "--a task that starts with dashes"
+Exit codes: 0 ok (HTTP 200) | 2 usage, or a request id already sent or answered |
+            3 missing or invalid config | 4 not sent, or refused with a 4xx: no run started,
+            safe to fix and resend | 5 accepted, but no result file within --timeout (or
+            --collect found none yet): the run may still be going, collect it later |
+            6 outcome unknown, no usable reply to the POST (timeout, dropped connection,
+            garbled reply, any 3xx, a 2xx other than 200, a 5xx): do NOT resend.
+"""
+import datetime
+import errno
+import http.client
+import json
+import math
+import os
+import re
+import secrets
+import socket
+import ssl
+import stat
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+URL_VAR = "GROKBOT_WEBHOOK_URL"
+KEY_VAR = "GROKBOT_WEBHOOK_KEY"
+TIMEOUT = 30
+MAX_ATTEMPTS = 3
+DEFAULT_WAIT = 600
+POLL = 5.0
+SETTLE = 3.0
+MAX_RESULT_BYTES = 1024 * 1024
+MAX_RESPONSE_BYTES = 64 * 1024  # the body is never printed; read only enough to finish cleanly
+EXIT_UNKNOWN = 6
+STATE_DIR_DEFAULT = "~/.local/state/grokbot/sent"
+REQUEST_ID_RE = re.compile(r"[A-Za-z0-9._-]{1,64}")
+LOOPBACK = {"127.0.0.1", "localhost", "::1"}
+# C0/C1 controls (minus \t and \n) plus bidi overrides, which can disguise text in a terminal.
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]")
+
+
+def die(code, msg):
+    print(f"grokbot-send: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def printable(text):
+    """Drop terminal control characters (escape sequences, bells) from untrusted text."""
+    return _CONTROL.sub("", text.replace("\r\n", "\n"))
+
+
+def outbox_dirs():
+    """(dir this process reads, same dir as the bot's local execution writes it)."""
+    local = os.path.expanduser(os.environ.get("GROKBOT_OUTBOX_DIR") or "~/grokbot-outbox")
+    bot = os.environ.get("GROKBOT_OUTBOX_BOT_DIR") or local
+    return local, bot
+
+
+def valid_request_id(rid):
+    # The id becomes a filename on the machine running the app, so it must never carry a path.
+    return bool(rid) and REQUEST_ID_RE.fullmatch(rid) is not None and rid not in (".", "..")
+
+
+def parse_args(argv):
+    opt = {"context": None, "request_id": None, "json": False, "task": None,
+           "wait": False, "timeout": DEFAULT_WAIT, "collect": None}
+    rest = []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--":
+            rest.extend(argv[i + 1:])
+            break
+        if a in ("-h", "--help"):
+            print(__doc__)
+            sys.exit(0)
+        elif a == "--json":
+            opt["json"] = True
+        elif a == "--wait":
+            opt["wait"] = True
+        elif a in ("--context", "--request-id", "--timeout", "--collect"):
+            if i + 1 >= len(argv):
+                die(2, f"{a} needs a value")
+            opt[a.lstrip("-").replace("-", "_")] = argv[i + 1]
+            i += 1
+        elif a.startswith("-"):
+            die(2, f"unknown option {a!r} (put '--' before a task that starts with '-')")
+        else:
+            rest.append(a)
+        i += 1
+    try:
+        opt["timeout"] = float(opt["timeout"])
+    except ValueError:
+        die(2, "--timeout must be a number of seconds")
+    if not math.isfinite(opt["timeout"]) or opt["timeout"] <= 0:
+        die(2, "--timeout must be a finite number of seconds above 0")
+    if opt["collect"] is not None:
+        if not valid_request_id(opt["collect"]):
+            die(2, "--collect needs a request id of letters, digits, '.', '_' or '-' (max 64)")
+        return opt
+    task = " ".join(rest).strip()
+    if not task:
+        die(2, "no task given. Usage: grokbot-send [--wait] [--context C] [--request-id ID] [--json] \"task\"")
+    opt["task"] = task
+    if opt["request_id"] is None:
+        stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        opt["request_id"] = f"gb-{stamp}-{secrets.token_hex(4)}"
+    if not valid_request_id(opt["request_id"]):
+        die(2, "--request-id must be letters, digits, '.', '_' or '-' (max 64)")
+    return opt
+
+
+def _has_space_or_control(value):
+    return any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in value)
+
+
+def check_webhook_key(key):
+    """A header value must be one clean token; anything else would surface in an error."""
+    try:
+        key.encode("latin-1")
+    except UnicodeEncodeError:
+        die(3, f"{KEY_VAR} contains characters a header cannot carry (value not shown)")
+    if _has_space_or_control(key):
+        die(3, f"{KEY_VAR} contains whitespace or control characters (value not shown)")
+
+
+def check_webhook_url(url):
+    """Accept https URLs (plain http only to loopback, for local testing). Never echo the value."""
+    if _has_space_or_control(url):
+        die(3, f"{URL_VAR} contains whitespace or control characters (value not shown)")
+    try:
+        parts = urllib.parse.urlsplit(url)
+        host = parts.hostname
+        _ = parts.port  # raises ValueError on a malformed port
+    except ValueError:
+        host, parts = None, None
+    if parts is None or not host:
+        die(3, f"{URL_VAR} is not a valid URL (value not shown)")
+    if parts.username is not None or parts.password is not None:
+        die(3, f"{URL_VAR} must not embed credentials (value not shown)")
+    if parts.scheme == "https" or (parts.scheme == "http" and host in LOOPBACK):
+        return
+    die(3, f"{URL_VAR} must be an https URL (value not shown)")
+
+
+def outbox_paths(request_id):
+    """(path the bot writes, path this process reads) for one request."""
+    local, bot = outbox_dirs()
+    name = f"{request_id}.md"
+    sep = "\\" if "\\" in bot else "/"
+    return bot.rstrip("\\/") + sep + name, os.path.join(local, name)
+
+
+def _state_path(request_id):
+    base = os.path.expanduser(os.environ.get("GROKBOT_STATE_DIR") or STATE_DIR_DEFAULT)
+    return base, os.path.join(base, request_id)
+
+
+def claim_request_id(request_id):
+    """Record the id atomically before sending; an id already recorded is never sent again.
+
+    The webhook has no documented idempotency, so a second POST with the same id (a rerun
+    after a --wait timeout, or two concurrent calls) could start a second run whose result
+    lands in the same outbox file. O_EXCL makes the first caller the only one to send.
+    """
+    base, path = _state_path(request_id)
+    os.makedirs(base, mode=0o700, exist_ok=True)
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        die(2, f"request id {request_id} was already sent from this machine; "
+               f"use --collect {request_id} or a new id")
+    with os.fdopen(fd, "w") as f:
+        f.write(datetime.datetime.now().astimezone().isoformat(timespec="seconds") + "\n")
+
+
+def release_request_id(request_id):
+    """Forget an id whose POST provably started no run (exit 4), so it can be resent."""
+    try:
+        os.unlink(_state_path(request_id)[1])
+    except FileNotFoundError:
+        pass
+
+
+def build_body(opt):
+    body = {"task": opt["task"], "request_id": opt["request_id"]}
+    if opt.get("context"):
+        body["context"] = opt["context"]
+    if opt.get("wait"):
+        bot_path, _ = outbox_paths(opt["request_id"])
+        body["deliver_to"] = bot_path
+        body["task"] = (
+            f"{opt['task']}\n\nWhen finished, write your final result as Markdown to "
+            f"{bot_path}.tmp on the computer running the Grok Bot desktop app, using Execution "
+            f"on Local Computer (not your cloud computer). Only after that write is complete, "
+            f"rename it to {bot_path}. Also reply in chat as usual."
+        )
+    return body
+
+
+def _read_result(path):
+    """Text of a regular (non-symlink) file, capped at MAX_RESULT_BYTES; None if the path is
+    missing or not a regular file. Other OSErrors (a writer's lock) propagate to the caller."""
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    try:
+        fd = os.open(path, flags)
+    except FileNotFoundError:
+        return None
+    except OSError as e:
+        if e.errno in (errno.ELOOP, errno.ENXIO):  # a symlink (O_NOFOLLOW) or a FIFO
+            return None
+        raise
+    with os.fdopen(fd, "rb") as f:
+        if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+            return None
+        data = f.read(MAX_RESULT_BYTES + 1)
+    # Windows PowerShell writes UTF-8 with a BOM (utf-8-sig drops it) or, with Out-File and >,
+    # UTF-16 with a BOM. CRLF and CR are folded to LF.
+    head = data[:MAX_RESULT_BYTES]
+    codec = "utf-16" if head[:2] in (b"\xff\xfe", b"\xfe\xff") else "utf-8-sig"
+    text = head.decode(codec, errors="replace")
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    if len(data) > MAX_RESULT_BYTES:
+        text += "\n[truncated]\n"
+    return text
+
+
+def wait_for_result(path, timeout=DEFAULT_WAIT, poll=POLL, settle=SETTLE):
+    """Return the file's text once it exists and has stopped changing, or None on timeout."""
+    deadline = time.monotonic() + timeout
+    last = None
+    stable_since = None
+    while time.monotonic() < deadline:
+        try:
+            st = os.lstat(path)
+            ready = stat.S_ISREG(st.st_mode) and st.st_size > 0
+            sig = (st.st_size, st.st_mtime_ns) if ready else None
+        except FileNotFoundError:
+            sig = None
+        if sig is not None and sig == last:
+            if stable_since is None:
+                stable_since = time.monotonic()
+            if time.monotonic() - stable_since >= settle:
+                try:
+                    text = _read_result(path)
+                except OSError:
+                    text = None  # e.g. still locked by the writer on Windows: keep waiting
+                if text is not None:
+                    return text
+                stable_since = None
+        else:
+            stable_since = None
+        last = sig
+        time.sleep(poll)
+    return None
+
+
+def should_retry(attempt, status, error):
+    """Decide whether to re-POST a request that was NOT sent (refused connection, DNS).
+
+    Keep this returning False. The webhook has no documented idempotency, and a retry is
+    only safe when the request provably never reached the server; everything that might
+    have reached it is reported as outcome-unknown instead of retried.
+    """
+    return False
+
+
+class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(req.full_url, code, "redirect refused", headers, fp)
+
+
+def _not_sent(reason):
+    """True only when the failure provably happened before any request bytes left: a refused
+    connection, a DNS failure, or a certificate rejected during the TLS handshake. Any other
+    TLS error can happen while the request is being written, so it is not proof."""
+    return isinstance(reason, (ConnectionRefusedError, socket.gaierror, ssl.SSLCertVerificationError))
+
+
+def post(url, key, body):
+    rid = body.get("request_id", "?")
+    data = json.dumps(body).encode("utf-8")
+    opener = urllib.request.build_opener(_RefuseRedirects)
+    attempt = 0
+    while True:
+        attempt += 1
+        req = urllib.request.Request(url, data=data, method="POST",
+                                     headers={"Content-Type": "application/json"})
+        req.add_unredirected_header("Authorization", f"Bearer {key}")
+        status, text, error = None, "", None
+        try:
+            with opener.open(req, timeout=TIMEOUT) as resp:
+                status, text = resp.status, resp.read(MAX_RESPONSE_BYTES).decode("utf-8", "replace")
+        except urllib.error.HTTPError as e:
+            status = e.code
+            try:
+                text = e.read(MAX_RESPONSE_BYTES).decode("utf-8", "replace")
+            except Exception:
+                text = ""
+        except urllib.error.URLError as e:
+            # Checked first: a certificate failure is also a ValueError, but it is a network
+            # outcome (nothing sent), not a bad config value.
+            if not _not_sent(e.reason) and isinstance(e.reason, (ValueError, http.client.InvalidURL)):
+                die(3, f"{URL_VAR} could not be used ({type(e.reason).__name__}); value not shown")
+            if not _not_sent(e.reason):
+                die(EXIT_UNKNOWN, f"outcome unknown for request_id={rid} ({type(e.reason).__name__}): "
+                                  f"the task may be running. Do not resend; check later with "
+                                  f"`grokbot-send --collect {rid}` or the bot's chat.")
+            error = e.reason
+        except (http.client.InvalidURL, ValueError, UnicodeError) as e:
+            # Raised while building the request, before anything is sent.
+            die(3, f"the webhook URL or key could not be used ({type(e).__name__}); values not shown")
+        except (TimeoutError, socket.timeout, http.client.HTTPException, ConnectionError, OSError) as e:
+            die(EXIT_UNKNOWN, f"outcome unknown for request_id={rid} ({type(e).__name__}): "
+                              f"the task may be running. Do not resend; check later with "
+                              f"`grokbot-send --collect {rid}` or the bot's chat.")
+        if status == 200:
+            return attempt, text
+        if status is not None and 400 <= status < 500:
+            die(4, f"webhook refused request_id={rid} with HTTP {status}; no run started "
+                   f"(response body not shown)")
+        if status is not None:
+            # Only 200 is documented as "run started". A redirect (never followed), a 2xx
+            # other than 200, or a 5xx reached a server without a clean answer.
+            what = "a redirect, not followed" if 300 <= status < 400 else f"HTTP {status}"
+            die(EXIT_UNKNOWN, f"outcome unknown for request_id={rid} ({what}): the task may be "
+                              f"running. Do not resend; check later with `grokbot-send --collect "
+                              f"{rid}` or the bot's chat.")
+        if attempt >= MAX_ATTEMPTS or not should_retry(attempt, status, error):
+            die(4, f"request_id={rid} was not sent ({type(error).__name__}: {error})")
+        time.sleep(2 ** attempt)
+
+
+def emit(opt, payload, text_line):
+    print(json.dumps(payload) if opt["json"] else printable(text_line))
+
+
+def main():
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
+    opt = parse_args(sys.argv[1:])
+    if opt["collect"]:
+        _, local_path = outbox_paths(opt["collect"])
+        if not os.path.lexists(local_path):
+            die(5, f"no result yet for {opt['collect']}")
+        result = wait_for_result(local_path, timeout=SETTLE + 2 * POLL, poll=1.0, settle=SETTLE)
+        if result is None:
+            die(5, f"the result for {opt['collect']} is still being written (or is not a regular file)")
+        emit(opt, {"request_id": opt["collect"], "result": result}, result)
+        return
+    url, key = os.environ.get(URL_VAR), os.environ.get(KEY_VAR)
+    if not url or not key:
+        die(3, f"set {URL_VAR} and {KEY_VAR} (inject them from your secret manager)")
+    check_webhook_url(url)
+    check_webhook_key(key)
+    rid = opt["request_id"]
+    if opt["wait"]:
+        local_dir, _ = outbox_dirs()
+        _, local_path = outbox_paths(rid)
+        if not os.path.isdir(local_dir):
+            die(3, f"GROKBOT_OUTBOX_DIR does not exist: {local_dir}")
+        if os.path.lexists(local_path):
+            die(2, f"request id {rid} already has a result; use --collect {rid} or a new id")
+    body = build_body(opt)
+    claim_request_id(rid)
+    try:
+        attempts, text = post(url, key, body)
+    except SystemExit as e:
+        if e.code in (3, 4):  # nothing was sent, or it was refused: no run started
+            release_request_id(rid)
+        raise
+    if not opt["wait"]:
+        emit(opt, {"accepted": True, "request_id": rid, "attempts": attempts},
+             f"accepted request_id={rid} (run started; the result posts in the bot's chat)")
+        return
+    print(f"accepted request_id={rid}; waiting up to {int(opt['timeout'])}s for the result",
+          file=sys.stderr)
+    result = wait_for_result(local_path, timeout=opt["timeout"])
+    if result is None:
+        die(5, f"no result within {int(opt['timeout'])}s; the run may still finish. "
+               f"Later: grokbot-send --collect {rid}")
+    emit(opt, {"accepted": True, "request_id": rid, "result": result}, result)
+
+
+if __name__ == "__main__":
+    main()

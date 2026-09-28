@@ -1,0 +1,250 @@
+#!/usr/bin/env python3
+"""grokbot-read - read Grok Bot's bot roster and chats from the desktop app's local cache.
+
+The desktop app keeps a local copy of each bot's chat as JSON "*.blob" files whose names
+are base32 of a key such as "...roster.last-roster" or "...transcript.replicas.<bot-id>".
+This format is UNDOCUMENTED (observed in the Windows app, version 0.58.0) and may change
+with any update. Read-only: no UI, no network. Only *.blob files in the cache folder are
+opened; the app keeps its secrets elsewhere in its data folder, and this never reads them.
+
+The cache is written as the app syncs; it is not the source of truth. For a task's result,
+use `grokbot-send --wait / --collect` (outbox files).
+
+Environment:
+  GROKBOT_STORE   the cache folder. Default on native Windows:
+                  %APPDATA%\\Grok Bot\\sand-client-persistence. Under WSL set it to
+                  /mnt/c/Users/<you>/AppData/Roaming/Grok Bot/sand-client-persistence.
+                  Other platforms: not verified; set it explicitly.
+
+Usage:
+  grokbot-read list [--json]
+  grokbot-read show <bot name | id prefix> [--grep TEXT] [--last N] [--json]
+"""
+import base64
+import stat
+import datetime
+import glob
+import json
+import os
+import re
+import sys
+
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]")
+
+
+def printable(text):
+    """Drop terminal control characters (escape sequences, bells) from untrusted chat text."""
+    return _CONTROL.sub("", str(text).replace("\r\n", "\n"))
+
+
+def default_store():
+    if os.environ.get("GROKBOT_STORE"):
+        return os.environ["GROKBOT_STORE"]
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        return os.path.join(appdata, "Grok Bot", "sand-client-persistence")
+    return None
+
+
+def decode_name(fname):
+    stem = os.path.basename(fname)[: -len(".blob")].upper()
+    stem += "=" * ((8 - len(stem) % 8) % 8)
+    return base64.b32decode(stem).decode("utf-8", "replace")
+
+
+MAX_BLOB_BYTES = 64 * 1024 * 1024
+
+
+def _blobs(store):
+    """Decoded key -> path, for regular files only (a symlink or FIFO is ignored)."""
+    out = {}
+    for f in glob.glob(os.path.join(store, "*.blob")):
+        try:
+            if not stat.S_ISREG(os.lstat(f).st_mode):
+                continue
+            out[decode_name(f)] = f
+        except (OSError, ValueError, UnicodeDecodeError):
+            continue
+    return out
+
+
+def _load(path):
+    """The blob's value, or None when it is unreadable, oversized, not a regular file, or
+    partially written. Opened without following symlinks and without blocking on a FIFO."""
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    try:
+        fd = os.open(path, flags)
+        with os.fdopen(fd, "rb") as f:
+            st = os.fstat(f.fileno())
+            if not stat.S_ISREG(st.st_mode) or st.st_size > MAX_BLOB_BYTES:
+                return None
+            value = json.loads(f.read(MAX_BLOB_BYTES + 1).decode("utf-8"))["value"]
+    except (OSError, ValueError, KeyError, TypeError, UnicodeDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _ts(row):
+    try:
+        return float(row.get("updatedAt") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _newest(blobs, suffix):
+    """The most recently written blob whose key ends with suffix (one per account slice)."""
+    keys = [k for k in blobs if k.endswith(suffix)]
+    if not keys:
+        return None
+
+    def mtime(k):
+        try:
+            return os.lstat(blobs[k]).st_mtime
+        except OSError:
+            return 0.0
+
+    return max(keys, key=mtime)
+
+
+def roster(store):
+    blobs = _blobs(store)
+    key = _newest(blobs, ".roster.last-roster")
+    if key is None:
+        return []
+    value = _load(blobs[key]) or {}
+    rows = value.get("rows")
+    # A row needs a usable id: transcripts are looked up by it.
+    rows = ([r for r in rows if isinstance(r, dict) and isinstance(r.get("id"), str) and r["id"]]
+            if isinstance(rows, list) else [])
+    return sorted(rows, key=_ts, reverse=True)
+
+
+def resolve(store, who):
+    rows = roster(store)
+    w = who.lower()
+    named = [r for r in rows if str(r.get("name") or "").lower() == w]
+    if len(named) > 1:
+        raise LookupError(f"{who!r} is ambiguous; use an id prefix: {[r['id'][:8] for r in named]}")
+    if named:
+        return named[0]
+    hits = [r for r in rows if str(r.get("id") or "").startswith(who)]
+    if len(hits) == 1:
+        return hits[0]
+    raise LookupError(f"no single bot matches {who!r}; known: {[str(r.get('name') or '') for r in rows]}")
+
+
+def _entry(e):
+    """(role, text) for one cache entry. Shapes observed in app 0.58.0:
+    message      {role: "user", content: str}         (what you typed)
+    send-message {message: {type, content: str}}      (what the bot said)
+    event        {event: {type, action, automationName}}
+    Anything else is rendered as JSON rather than trusted.
+    """
+    kind = e.get("kind")
+    if kind == "send-message":
+        msg = e.get("message")
+        if isinstance(msg, dict) and isinstance(msg.get("content"), str):
+            return "bot", msg["content"]
+        return "bot", msg if isinstance(msg, str) else json.dumps(msg, ensure_ascii=False)
+    if kind == "event":
+        ev = e.get("event")
+        if not isinstance(ev, dict):
+            return "event", json.dumps(ev, ensure_ascii=False)
+        name = str(ev.get("automationName") or ev.get("type") or "event")
+        return "event", f"{name}: {ev.get('type', '')} {ev.get('action', '')}".strip()
+    content = e.get("content")
+    text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
+    role = e.get("role")
+    return ("user" if role == "user" else str(role or kind or "?")), text
+
+
+def transcript(store, who):
+    bot = resolve(store, who)
+    blobs = _blobs(store)
+    key = _newest(blobs, f".transcript.replicas.{bot['id']}")
+    if key is None:
+        return []
+    out = []
+    entries = (_load(blobs[key]) or {}).get("entries")
+    for e in entries if isinstance(entries, list) else []:
+        if not isinstance(e, dict):
+            continue
+        role, text = _entry(e)
+        out.append({"ts": e.get("timestampMs"), "role": role, "text": text})
+    return out
+
+
+def _fmt_ts(ms):
+    try:
+        return datetime.datetime.fromtimestamp(float(ms) / 1000).strftime("%m-%d %H:%M:%S")
+    except (TypeError, ValueError, OverflowError, OSError):
+        return "?"
+
+
+def main(argv):
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__)
+        return
+    store = default_store()
+    if not store or not os.path.isdir(store):
+        print("grokbot-read: set GROKBOT_STORE to the app's sand-client-persistence folder",
+              file=sys.stderr)
+        sys.exit(2)
+    as_json = "--json" in argv
+    if argv[0] == "list":
+        rows = roster(store)
+        if as_json:
+            print(json.dumps([{"name": r.get("name"), "id": r.get("id"), "updatedAt": r.get("updatedAt"),
+                               "last": (r.get("lastEntry") if isinstance(r.get("lastEntry"), dict) else {}).get("text")}
+                              for r in rows], indent=2))
+            return
+        for r in rows:
+            entry = r.get("lastEntry") if isinstance(r.get("lastEntry"), dict) else {}
+            last = printable(entry.get("text") or "").replace("\n", " ")[:80]
+            name = printable(r.get("name") or "")
+            rid = printable(str(r.get("id") or ""))[:8]
+            print(f"{rid}  {_fmt_ts(_ts(r))}  {name:<22} {last}")
+        return
+    if argv[0] == "show" and len(argv) > 1:
+        grep, last = None, None
+        if "--grep" in argv:
+            i = argv.index("--grep")
+            if i + 1 >= len(argv) or argv[i + 1].startswith("--"):
+                print("grokbot-read: --grep needs a value", file=sys.stderr)
+                sys.exit(2)
+            grep = argv[i + 1].lower()
+        if "--last" in argv:
+            i = argv.index("--last")
+            try:
+                last = int(argv[i + 1])
+            except (IndexError, ValueError):
+                last = 0
+            if last < 1:
+                print("grokbot-read: --last needs a whole number of 1 or more", file=sys.stderr)
+                sys.exit(2)
+        try:
+            entries = transcript(store, argv[1])
+        except LookupError as e:
+            print(f"grokbot-read: {printable(e)}", file=sys.stderr)
+            sys.exit(2)
+        if grep is not None:
+            entries = [e for e in entries if grep in e["text"].lower()]
+        if last is not None:
+            entries = entries[-last:]
+        if as_json:
+            print(json.dumps(entries, indent=2))
+            return
+        if not entries:
+            print("(no cached entries; the app may not have written this chat yet)")
+        for e in entries:
+            print(f"[{_fmt_ts(e['ts'])}] {printable(e['role']).upper()}: {printable(e['text'])}\n")
+        return
+    print(__doc__)
+    sys.exit(2)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
