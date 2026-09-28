@@ -6,6 +6,14 @@ an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-28
+
+Catalog has grown from 26 skills to 27.
+
+### Added
+
+- **grokbot**: hands a task to a bot in xAI's Grok Bot desktop app through the documented routine webhook, and gets the result back through an outbox file the bot writes with the app's local execution, so no UI is touched (`grokbot-send --wait`, `--collect`). Also reads any bot's chat from the app's local cache (`grokbot-read`, an undocumented format labeled as such). Rails enforced in code: never resends a request that might have reached the server (the webhook has no documented idempotency), reporting an outcome-unknown exit with the request id instead; refuses webhook redirects so the key never reaches another host; accepts only https webhook URLs and never prints the URL or key; rejects path-like and reused request ids; reads only regular, size-capped result files and strips terminal control characters from anything it prints. The skill sets out when a bot is the right tool, the webhook-key plus local-execution trade-off, and the rules for driving the app's UI over the DevTools protocol. Ships a capability reference cited to the official docs.
+
 ### Fixed
 
 - `readonly` hook: a `json.py` (or `json/` package) in the session directory no
