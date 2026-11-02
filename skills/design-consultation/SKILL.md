@@ -307,3 +307,8 @@ To keep this skill lean, depth was moved to `references/` (load only when needed
 
 - Shared runtime conventions (AskUserQuestion format, voice, jargon glossary) → `references/preamble.md`
 - 2 detailed section(s) → `references/details.md`: Phase 3: The Complete Proposal, Phase 5: Design System Preview (default ON)
+
+## Attribution
+
+See [source and modification history](PROVENANCE.md) and the upstream license
+notice in this skill directory; retain them when copying the skill.

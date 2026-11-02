@@ -476,3 +476,8 @@ silently, and never leave a shipped change with stale or missing docs.
 To keep this skill lean, depth was moved to `references/` (load only when needed):
 
 - Shared runtime preamble (10 sections) → `references/preamble.md`
+
+## Attribution
+
+See [source and modification history](PROVENANCE.md) and the upstream license
+notice in this skill directory; retain them when copying the skill.

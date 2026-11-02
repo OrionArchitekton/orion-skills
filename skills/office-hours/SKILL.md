@@ -529,3 +529,8 @@ To keep this skill lean, depth was moved to `references/` (load only when needed
 
 - Shared runtime preamble → `references/preamble.md`
 - 4 detailed section(s) → `references/details.md`: Phase 2A: Startup Mode (YC Product Diagnostic), Phase 3.5: Cross-Model Second Opinion (optional), Visual Sketch (UI ideas only), Phase 6: Handoff (The Relationship Closing)
+
+## Attribution
+
+See [source and modification history](PROVENANCE.md) and the upstream license
+notice in this skill directory; retain them when copying the skill.
