@@ -2,8 +2,9 @@
 
 This skill includes material adapted from [garrytan/gstack](https://github.com/garrytan/gstack)
 under the MIT license. Keep [LICENSE.gstack](LICENSE.gstack) with a copy of this
-skill directory. Orion's modifications remain covered by the collection's license;
-this notice preserves upstream attribution.
+skill directory. [LICENSE.orion](LICENSE.orion) preserves Dan Mercede's
+collection copyright and MIT notice for Orion's modifications. These notices
+travel together in a standalone skill copy.
 
 Verified comparison revision: `4f435e45c517822014a852804c3da57bab121516`
 (2026-03-26). [Source skill](https://github.com/garrytan/gstack/blob/4f435e45c517822014a852804c3da57bab121516/investigate/SKILL.md).
@@ -27,6 +28,7 @@ Verified source revision: `4ae2317ddb22b046e26455e4f9c9b3aaaf62212d`.
 [Source skill](https://github.com/mattpocock/skills/blob/4ae2317ddb22b046e26455e4f9c9b3aaaf62212d/skills/engineering/diagnosing-bugs/SKILL.md)
 and [HITL template](https://github.com/mattpocock/skills/blob/4ae2317ddb22b046e26455e4f9c9b3aaaf62212d/skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.sh).
 The port concentrates the feedback-loop discipline into the root-cause gate and
-bundles the HITL template. This is a comparison reference, not a claim that the
+bundles the HITL template with a portability comment and underscore-prefixed
+Bash locals that avoid capture-variable collisions. This is a comparison reference, not a claim that the
 original import pinned that revision. Keep
 [LICENSE.diagnosing-bugs](LICENSE.diagnosing-bugs) with this directory as well.

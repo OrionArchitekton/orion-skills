@@ -2,8 +2,9 @@
 
 This skill includes material adapted from [garrytan/gstack](https://github.com/garrytan/gstack)
 under the MIT license. Keep [LICENSE.gstack](LICENSE.gstack) with a copy of this
-skill directory. Orion's modifications remain covered by the collection's license;
-this notice preserves upstream attribution.
+skill directory. [LICENSE.orion](LICENSE.orion) preserves Dan Mercede's
+collection copyright and MIT notice for Orion's modifications. These notices
+travel together in a standalone skill copy.
 
 Verified comparison revision: `4f435e45c517822014a852804c3da57bab121516`
 (2026-03-26). [Source skill](https://github.com/garrytan/gstack/blob/4f435e45c517822014a852804c3da57bab121516/office-hours/SKILL.md).
