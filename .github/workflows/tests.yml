@@ -14,7 +14,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
       - name: Install test dependencies
         run: python -m pip install --disable-pip-version-check -r requirements-test.txt
-      - name: Run contract tests
-        run: python -m unittest discover -s tests
+      - name: Run offline contracts and bundled checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_root=$(mktemp -d)
+          trap 'rm -rf "$test_root"' EXIT
+          offline() {
+            env -i PATH="$PATH" HOME="$test_root" TMPDIR="$test_root" LC_ALL=C.UTF-8 "$@"
+          }
+          offline python -m pytest -q
+          offline python -m unittest discover -s tests
+          offline python skills/x/publish-core/selftest.py
+          offline python skills/gist/publish-core/selftest.py
+          offline python skills/orion-deep-research/scripts/test_abstention_report.py
+          offline node --test skills/orion-deep-research/lib/*.test.mjs
+          bash -n skills/office-hours/scripts/private-state.sh

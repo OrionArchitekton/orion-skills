@@ -59,33 +59,17 @@ delegate.fanout([
   commonly bake those in; this layer exists partly to avoid that.
 - Child env is a least-privilege WHITELIST: base keys + ONLY the target's own key; no
   sibling-provider keys, no GH/Slack/secret-manager/Anthropic tokens.
-- Child CLI must resolve from a checked POSIX installation location before launch; an
-  absolute `shutil.which` result alone is not trusted. See the boundary below.
+- Child CLI selection is converted to an absolute path with `shutil.which` before
+  spawning. This preserves the selected path; it does not authenticate the executable.
+  An unsafe or current-directory PATH entry can still select a planted binary.
+  Review PATH and the selected installation before delegation. A stricter installation
+  policy is deferred pending an explicit supported-platform/layout compatibility decision.
 - codex sandbox defaults read-only; `--write` escalates to `workspace-write` (never `danger-full-access`).
 - codex stdin is `/dev/null` (guards the >=0.120 non-TTY exec deadlock).
 - **Rule of Two:** a delegate acting on untrusted input must not also hold private access AND
   unsandboxed/consequential output at once. Keep the sandbox read-only unless you have vetted the input.
 
 ## Gotchas
-
-- Executable selection accepts absolute PATH entries in `/usr/bin`, `/usr/local/bin`,
-  `/bin`, and the account's `~/.local/bin` or `~/.npm-global/bin`. The account home comes
-  from the OS account database, not `$HOME`. System targets must remain inside `/usr`
-  (or `/bin` on unmerged systems) and be root-owned. User targets must remain in the
-  corresponding `.local` or `.npm-global` installation tree and be owned by root or the
-  current user. Every ancestor and symlink hop must have an allowed owner; regular files
-  and directories must have no group or world write permission. Relative, cwd, unknown
-  installation, broken, cyclic and escaping symlink candidates fail before spawning;
-  an unsafe first PATH hit is rejected,
-  never silently replaced by a later executable. Existing command forms and result fields
-  are unchanged. Nonstandard installations need a reviewed local policy adaptation; there
-  is no arbitrary absolute-path bypass or automatic trust registration.
-- This is an initial executable selection check, not publisher/signature verification or
-  OS isolation. The OS, administrator and same-user installers are trusted. A malicious
-  same-user process can replace files after inspection; this does not pin immutable bytes.
-  Child interpreters, dependencies, plugins, inherited PATH and filesystem access through
-  HOME remain the CLI/operator's responsibility. Environment filtering does not prevent
-  a process from reading files the user can read. Use OS isolation for hostile code/input.
 
 - grok/gemma need their config at call time: an `XAI_API_KEY` for grok, an `OLLAMA_HOST` pointed
   at your endpoint for gemma. Without them the run fails honestly (no silent fallback). A shell

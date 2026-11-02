@@ -45,6 +45,60 @@ def publisher(surface):
 
 
 class PublishSafetyContract(unittest.TestCase):
+    @unittest.skipUnless(hasattr(os, 'mkfifo'), 'FIFO fixture requires POSIX')
+    def test_special_files_refuse_before_reading(self):
+        for surface in ('x', 'gist'):
+            with self.subTest(surface=surface), publisher(surface) as (m, root, rules):
+                rules.unlink()
+                os.mkfifo(rules)
+                with patch.object(Path, 'read_text', side_effect=AssertionError('must not open FIFO')):
+                    self.assertEqual(m['redactor'].decision('Public note')[0], 'ABSTAIN')
+
+    def test_regex_lines_keep_json_looking_text_and_comments_compatible(self):
+        cases = [('[123]', '2', 'unrelated'),
+                 ('[true]', 't', 'xyz'),
+                 ('{"x":1}', '{"x":1}', 'unrelated'),
+                 ('# comment\n[123]\n\n[true]\n{"x":1}\n', '3', 'xyz')]
+        for surface in ('x', 'gist'):
+            for content, matching, clean in cases:
+                with self.subTest(surface=surface, rules=content), publisher(surface) as (m, root, rules):
+                    rules.write_text(content, encoding='utf-8')
+                    self.assertEqual(m['redactor'].decision(matching)[0], 'ABSTAIN')
+                    self.assertEqual([kind for kind, _ in m['redactor'].decision(matching)[1]], ['custom'])
+                    self.assertEqual(m['redactor'].decision(clean), ('PUBLISH', []))
+                    for text, expected in ((matching, 3), (clean, 0)):
+                        candidate = root / 'candidate.txt'
+                        candidate.write_text(text, encoding='utf-8')
+                        with contextlib.redirect_stdout(io.StringIO()):
+                            self.assertEqual(m['redactor'].main(['--check', str(candidate)]), expected)
+
+    def test_compiler_exhaustion_is_a_nonoverridable_config_failure(self):
+        for surface in ('x', 'gist'):
+            for failure in (RecursionError('private rule'), MemoryError('private rule')):
+                with self.subTest(surface=surface, failure=type(failure).__name__), publisher(surface) as (m, root, rules):
+                    rules.write_text('SYNTHETIC_RULE')
+                    client, common, caps = m[surface + '_client'], m['common'], m['cap_ledger']
+                    with contextlib.ExitStack() as stack:
+                        stack.enter_context(patch.object(m['redactor'].re, 'compile', side_effect=failure))
+                        stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+                        stack.enter_context(contextlib.redirect_stderr(io.StringIO()))
+                        reserve = stack.enter_context(patch.object(caps, 'reserve'))
+                        if surface == 'x':
+                            stack.enter_context(patch.object(client, '_creds_from_env', return_value={n: 'fake' for n in client.CRED_NAMES}))
+                            stack.enter_context(patch.object(common, 'is_armed', return_value=True))
+                            send = stack.enter_context(patch.object(client, 'send'))
+                            args = ['post', '--text', 'Public note', '--send']
+                        else:
+                            stack.enter_context(patch.object(client, 'fetch_public', return_value='Public note'))
+                            stack.enter_context(patch.object(common, 'is_gist_armed', return_value=True))
+                            send = stack.enter_context(patch.object(client, 'create_gist'))
+                            args = ['create', '--repo', 'o/r', '--path', 'f.md', '--ack-public-hits', '--send']
+                        self.assertEqual(m['redactor'].decision('Public note')[0], 'ABSTAIN')
+                        self.assertEqual(client.main(args), 3)
+                    reserve.assert_not_called()
+                    send.assert_not_called()
+                    self.assertFalse(common.CAPS_PATH.exists())
+
     def test_invalid_regex_abstains_without_disclosing_rule(self):
         for surface in ("x", "gist"):
             with self.subTest(surface=surface), publisher(surface) as (m, root, rules):

@@ -1,7 +1,6 @@
 # Tool evidence fixtures
 
-Synthetic local data only. Executable fixtures are created in disposable directories by
-the tests and never invoke a provider. Scanner fixtures exercise the published shell
+Synthetic local data only. Tests never invoke a provider. Scanner fixtures exercise the published shell
 example; clean scanner output is an empty JSON array. No credentials are required.
 
 `gitleaks-clean.json` is the exact report emitted by installed Gitleaks 8.24.3 for a

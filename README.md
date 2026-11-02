@@ -2,7 +2,7 @@
 
 Part of [Cosmocrat OS](https://www.cosmocrat.ai/), a family of independent tools for human-directed AI work. [Choose a starting workflow](https://www.cosmocrat.ai/docs). This project keeps its own installation identifiers, releases, license and support boundaries.
 
-A small, curated library of original Agent Skills for disciplined coding-agent
+A curated library of Orion-authored and adapted agent skills for disciplined coding-agent
 workflows. The full library targets
 [Claude Code](https://docs.claude.com/en/docs/claude-code); a narrowly validated
 starter set also supports [Codex CLI](https://developers.openai.com/codex/skills).
@@ -132,7 +132,7 @@ validated as a Codex set.
 | [`incident-as-code`](skills/incident-as-code/SKILL.md) | Closes a resolved incident by committing a `docs/solutions/` doc (and a runbook when recurrent) into the affected repo. | An incident is root-caused and fixed, or a postmortem is asked for. |
 | [`learn-capture`](skills/learn-capture/SKILL.md) | The compound loop's closing step: route accreted lessons to durable homes (agent memory vs repo `AGENTS.md`). | After a review, merge, or substantial task, "what did we learn?". |
 | [`goal-prompt`](skills/goal-prompt/SKILL.md) | Turns a loose task into a fire-ready autonomous goal prompt: recon-grounded, rails-locked, with a transcript-checkable terminal condition. Builds the prompt; never fires it. | You want to author a `/goal` or `/deep-research` prompt for a hands-off run. |
-| [`orion-deep-research`](skills/orion-deep-research/SKILL.md) | Fork of the native deep-research that adds honest abstention accounting (a rate-limited claim is `unverified`, never `refuted`), a bounded reflect/knowledge-gap loop, an independent judge-gate that quarantines inconclusive runs, and durable persistence of the cited report to a research vault. Self-contained; harness-agnostic. | You need a deep, multi-source, fact-checked report that must survive the session and be re-findable, not a throwaway answer. |
+| [`orion-deep-research`](skills/orion-deep-research/SKILL.md) | Research workflow with honest abstention accounting, a bounded knowledge-gap loop, a judge gate, and durable cited reports. Research principles are portable; the executable requires a compatible Claude Workflow tool. Native execution support is unqualified; implementation origin needs author evidence and blocks whole-collection release. | You need a deep, multi-source report and have verified the executor and output prerequisites in the skill. |
 | [`pre-compact`](skills/pre-compact/SKILL.md) | Captures a session into a persistent, queryable context pack so a fresh instance resumes with zero re-derivation. Engine-agnostic. | Before `/compact`, near the context limit, or handing off in-progress work. |
 | [`x`](skills/x/SKILL.md) | Post to X (Twitter), manually or autonomously, behind a fail-closed safety harness: a redactor that abstains rather than leak, a per-day cap, and an arm-flag so it ships DISARMED. Direct OAuth1.0a, stdlib-only. | An agent should publish a short note to X, safely, manual or hands-off. |
 | [`gist`](skills/gist/SKILL.md) | Publish an embeddable PUBLIC gist of ALREADY-public content, fetched over the unauthenticated raw URL so world-readability is structural, not a promise. Redactor backstop, per-day cap, ships DISARMED, human-gated. The safe pattern for a code surface. | You want to share/embed a file that is already in a public repo, safely. |
@@ -147,7 +147,7 @@ validated as a Codex set.
 | [`reprobe-stale-premise`](skills/reprobe-stale-premise/SKILL.md) | Treats any inherited claim you did not just verify (a handoff's "still broken," a teammate's diagnosis, "tool X doesn't exist," a registry's "UNBUILT") as a hypothesis, not a fact, and re-probes live ground truth (fetched origin, real PR state, an actual reproduction) before you act on it. | You're about to fix, build, or rely on something based on a claim you inherited rather than just verified, especially on a shared multi-session box. |
 | [`triage-fanout-verdicts`](skills/triage-fanout-verdicts/SKILL.md) | Reads verify/judge fan-out output by its MECHANISM fields (votes cast, reads completed, verifier errors) instead of its verdict label, so a rate-limited "all refuted" or a dead "survived the skeptic" never coerces into a real verdict; ships a bundled bucketing script that exits 3 on any pending claim. | You're relaying or acting on a fan-out of verify/judge/skeptic verdicts, especially a unanimous one or one that saw rate limits or timeouts. |
 | [`investigate`](skills/investigate/SKILL.md) | Four-phase root-cause debugging discipline (investigate, analyze, hypothesize, implement), gated on a red-capable reproduction you've actually run before any hypothesis, and a regression test that fails before the fix and passes after. | You're asked to debug an error, fix a bug, or figure out why something that used to work just broke. |
-| [`document-release`](skills/document-release/SKILL.md) | Post-ship documentation pass: cross-references the diff against README/ARCHITECTURE/CONTRIBUTING/CLAUDE.md, polishes CHANGELOG voice without rewriting history, cleans up TODOS, and always asks before bumping VERSION. | After `/ship`, before the PR merges, when the docs need to catch up to what shipped. |
+| [`document-release`](skills/document-release/SKILL.md) | Reviews release docs against the feature branch after code commits, polishes CHANGELOG voice without rewriting history, and asks before bumping VERSION. | On the feature branch after code commits and before PR merge. |
 | [`office-hours`](skills/office-hours/SKILL.md) | Product-ideation partner: startup mode pushes six forcing questions until "everyone wants this" becomes a named customer with real demand evidence; builder mode is an enthusiastic riff partner for side projects. Both modes end in a reviewed design doc and one concrete next action, never in code. | You have an idea you haven't validated yet, or you're asked "is this worth building". |
 | [`design-consultation`](skills/design-consultation/SKILL.md) | Proposes a complete, coherent design system (aesthetic, typography, color, layout, spacing, motion) as one package, not a menu, with an explicit safe-choices-vs-risks breakdown, then generates a working HTML preview page and writes DESIGN.md as the project's source of truth. | Starting a new project's UI with no DESIGN.md yet, or asked for "design system" / "brand guidelines". |
 | [`delegate`](skills/delegate/SKILL.md) | Hands a scoped subagent, bulk, or background task to a non-Anthropic model CLI (Codex on a ChatGPT plan, Grok on a metered xAI key, or a free local model via Ollama) so it runs off the Anthropic budget with that vendor's native tool calling, behind a sandbox and env-scrub gate. Shells out to each vendor's own CLI; it is not an `ANTHROPIC_BASE_URL` router-proxy (a proxy corrupts tool calls). | You want subagent/workflow fan-out to run on another model off your Anthropic allocation, without the router-proxy tool-calling trap. |
@@ -249,10 +249,10 @@ validated as a Codex set.
   one command that reproduces the 500 on demand, confirm three hypotheses in turn (the
   first two don't match the evidence), then fix the third, root cause, and write a
   regression test that fails without the fix and passes with it.
-- **`document-release`**: You just merged a PR that added a new CLI flag. `document-release`
-  reads the diff, adds the flag to README's usage table, flags the CHANGELOG entry for a
-  voice pass (never rewriting its content), and asks before bumping VERSION rather than
-  bumping it silently.
+- **`document-release`**: Your feature branch adds a new CLI flag; before merging,
+  `document-release` checks that branch's diff and updates release docs. It adds the flag
+  to README's usage table, flags the CHANGELOG entry for a voice pass, and asks before
+  bumping VERSION.
 - **`office-hours`**: "I have an idea for a tool that tracks X." Startup mode pushes past
   "people would use this" to "Sarah, the ops manager at a 50-person logistics company,
   would pay for this today," forces two distinct implementation approaches before any code
@@ -289,6 +289,22 @@ These skills follow Anthropic's authoring guidance:
 ## License & attribution
 
 MIT, see [LICENSE](LICENSE). Copyright (c) 2026 Dan Mercede.
+
+`office-hours`, `investigate`, `design-consultation` and `document-release`
+include adaptations of [garrytan/gstack](https://github.com/garrytan/gstack),
+Copyright (c) 2026 Garry Tan, MIT. Verified comparison revision:
+`4f435e45c517822014a852804c3da57bab121516`. `investigate` also adapts
+[Matt Pocock's diagnosing-bugs](https://github.com/mattpocock/skills),
+Copyright (c) 2026 Matt Pocock, MIT; verified comparison revision:
+`4ae2317ddb22b046e26455e4f9c9b3aaaf62212d`. These snapshots do not establish
+the unrecorded original import revisions. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+and each adapted skill's `PROVENANCE.md` and license files. Preserve those files
+when copying a skill on its own.
+
+The research implementation's [origin and redistribution evidence](skills/orion-deep-research/PROVENANCE.md)
+remain unresolved. This is a whole-collection release blocker, not evidence of
+infringement or a grant of permission. The existing implementation is retained
+while author evidence is obtained. Tests do not establish native execution or rights.
 
 `learn-capture` operationalizes the **"compound loop"** idea (plan → work → review →
 capture) popularized by [Every](https://every.to)'s writing on compounding engineering.

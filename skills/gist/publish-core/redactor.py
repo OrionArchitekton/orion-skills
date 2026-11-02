@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import os
 import re
+import stat
 import sys
 from pathlib import Path
 
@@ -80,6 +81,8 @@ def _load_custom():
     """
     pats, errors = [], []
     try:
+        if not stat.S_ISREG(CUSTOM_PATH.stat().st_mode):
+            return pats, [(0, "unreadable-config")]
         contents = CUSTOM_PATH.read_text(encoding="utf-8")
     except FileNotFoundError:
         if "X_DENYLIST_FILE" in os.environ or CUSTOM_PATH.is_symlink():
@@ -93,7 +96,7 @@ def _load_custom():
             continue
         try:
             pats.append(("custom", re.compile(s, re.IGNORECASE)))
-        except (re.error, OverflowError):
+        except (re.error, OverflowError, RecursionError, MemoryError):
             errors.append((lineno, "invalid-regex"))
     return pats, errors
 
