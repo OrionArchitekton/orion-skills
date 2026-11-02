@@ -69,3 +69,11 @@ machine-screening real **source code** (embedded secrets, structural identifiers
 business logic). For code/config surfaces: keep them human-gated, pair the
 denylist with an entropy/allowlist secret scanner (gitleaks/trufflehog-class),
 and prefer publishing material that is already public.
+
+Configuration failures also return ABSTAIN. An absent default denylist keeps the
+built-in-only optional behavior. Setting `$X_DENYLIST_FILE` makes that input
+required: it must exist, be readable UTF-8 text, and contain one valid Python
+regex per non-comment line. A directory is not a denylist. A malformed rule
+blocks the whole guard, including redacted previews; diagnostics identify the
+failure class and line number without printing private rules. Gist's
+`--ack-public-hits` never overrides a configuration failure.

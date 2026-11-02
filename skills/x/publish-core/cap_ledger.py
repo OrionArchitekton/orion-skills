@@ -19,7 +19,9 @@ CLI:
 """
 from __future__ import annotations
 
+import datetime
 import json
+import re
 import sys
 
 import common
@@ -29,11 +31,33 @@ def _bucket(surface: str):
     return common.bucket_key(surface)
 
 
+def _read_ledger():
+    """Validate all saved consumption, including other dates and surfaces."""
+    ledger = common.read_json(common.CAPS_PATH, {})
+    if not isinstance(ledger, dict):
+        raise common.StateError("cap-ledger: invalid-shape")
+    for bucket, counts in ledger.items():
+        try:
+            if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", bucket):
+                datetime.date.fromisoformat(bucket)
+            elif re.fullmatch(r"[0-9]{4}-W[0-9]{2}", bucket):
+                datetime.date.fromisocalendar(int(bucket[:4]), int(bucket[6:]), 1)
+            else:
+                raise ValueError
+        except ValueError:
+            raise common.StateError("cap-ledger: invalid-date") from None
+        if not isinstance(counts, dict) or any(
+                not name or type(count) is not int or count < 0
+                for name, count in counts.items()):
+            raise common.StateError("cap-ledger: invalid-counts")
+    return ledger
+
+
 def current(surface: str) -> int:
     if surface not in common.CAPS:
         raise ValueError(f"unknown surface: {surface}")
-    ledger = common.read_json(common.CAPS_PATH, {})
-    return int(ledger.get(_bucket(surface), {}).get(surface, 0))
+    ledger = _read_ledger()
+    return ledger.get(_bucket(surface), {}).get(surface, 0)
 
 
 def remaining(surface: str) -> int:
@@ -49,9 +73,9 @@ def _do_increment(surface: str, enforce_cap: bool):
     if enforce_cap and already at cap (no write). The lock makes check+increment
     atomic across concurrent processes (no lost-update over-publish)."""
     with common.cap_lock():
-        ledger = common.read_json(common.CAPS_PATH, {})
+        ledger = _read_ledger()
         bucket = _bucket(surface)
-        prior = int(ledger.get(bucket, {}).get(surface, 0))   # read under lock
+        prior = ledger.get(bucket, {}).get(surface, 0)   # read under lock
         if enforce_cap and prior >= common.CAPS[surface]:
             return None
         new = prior + 1
@@ -75,13 +99,13 @@ def reserve(surface: str):
     return _do_increment(surface, enforce_cap=True)
 
 
-def main(argv) -> int:
+def _main(argv) -> int:
     if not argv:
         print("usage: cap_ledger.py check|incr|reserve <surface> | show", file=sys.stderr)
         return 2
     cmd = argv[0]
     if cmd == "show":
-        print(json.dumps(common.read_json(common.CAPS_PATH, {}), indent=2, sort_keys=True))
+        print(json.dumps(_read_ledger(), indent=2, sort_keys=True))
         return 0
     if cmd not in ("check", "incr", "reserve") or len(argv) < 2:
         print("usage: cap_ledger.py check|incr|reserve <surface> | show", file=sys.stderr)
@@ -105,6 +129,14 @@ def main(argv) -> int:
         return 4
     print(f"recorded: {surface} {new}/{cap} for {_bucket(surface)}")
     return 4 if new >= cap else 0
+
+
+def main(argv) -> int:
+    try:
+        return _main(argv)
+    except (common.StateError, OSError):
+        print("REFUSED: cap-ledger state is invalid or unreadable; preserve and repair it.", file=sys.stderr)
+        return 5
 
 
 if __name__ == "__main__":

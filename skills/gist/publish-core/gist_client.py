@@ -290,6 +290,11 @@ def main(argv) -> int:
     plan = build_plan(files, repo, ref, description)
     if not plan["clean"]:
         hit_classes = sorted({c for f in plan["files"] for c in f["hit_classes"]})
+        if "redactor-config" in hit_classes:
+            print("REFUSED: redactor configuration failed; repair it before publishing.", file=sys.stderr)
+            print_plan(plan)
+            common.log_line("gist REFUSED reason=redactor-config")
+            return 3
         if not ack_hits:
             print("VERDICT: ABSTAIN, redactor backstop flagged already-public content.")
             print_plan(plan)
@@ -358,7 +363,12 @@ def main(argv) -> int:
     #    `gh gist create` the slot stays consumed, fail SAFE by over-counting
     #    rather than leave a public gist uncounted.
     import cap_ledger  # local sibling
-    reserved = cap_ledger.reserve("gist")
+    try:
+        reserved = cap_ledger.reserve("gist")
+    except (common.StateError, OSError):
+        print("REFUSED: cap-ledger state is invalid or unreadable; preserve and repair it.", file=sys.stderr)
+        common.log_line("gist send REFUSED reason=cap-state")
+        return 5
     if reserved is None:
         cap = common.CAPS["gist"]
         print(f"REFUSED: gist daily cap reached ({cap_ledger.current('gist')}/{cap} "

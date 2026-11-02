@@ -148,6 +148,16 @@ def main(argv) -> int:
         common.log_line("x send REFUSED reason=no-real-creds")
         return 0
 
+    # Validate the exact candidate placed in req["body"], before consuming a
+    # slot or reaching the network. A separate procedural check is insufficient.
+    import redactor  # local sibling
+    verdict, hits = redactor.decision(text)
+    if verdict != "PUBLISH":
+        classes = sorted({cls for cls, _ in hits})
+        print(f"REFUSED: redactor ABSTAIN classes={classes}. No tweet sent.", file=sys.stderr)
+        common.log_line(f"x send REFUSED reason=redactor-abstain classes={classes}")
+        return 3
+
     # Cap gate (fail-closed, in the LIVE path, not a separate manual step).
     # RESERVE the slot BEFORE the irreversible POST: reserve() is an atomic
     # check-and-increment under a cross-process flock, so two concurrent --sends
@@ -155,7 +165,12 @@ def main(argv) -> int:
     # stays consumed, fail SAFE by over-counting rather than leave a tweet
     # uncounted. (Same shape as the gist path.)
     import cap_ledger  # local sibling
-    reserved = cap_ledger.reserve("x")
+    try:
+        reserved = cap_ledger.reserve("x")
+    except (common.StateError, OSError):
+        print("REFUSED: cap-ledger state is invalid or unreadable; preserve and repair it.", file=sys.stderr)
+        common.log_line("x send REFUSED reason=cap-state")
+        return 5
     if reserved is None:
         cap = common.CAPS["x"]
         print(f"REFUSED: X daily cap reached ({cap_ledger.current('x')}/{cap} "
