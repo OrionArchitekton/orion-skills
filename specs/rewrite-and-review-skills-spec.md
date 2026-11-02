@@ -71,6 +71,7 @@ proof retains its patch/tree identity and is labeled accordingly; this creates
 no authority to commit. The synthetic scenario runs the probe on Git-object
 source despite unstaged/staged/untracked files and index flags that conceal
 local repairs. Unknown revisions, missing source and Git errors block proof.
+Object reads do not permit replacement refs to substitute a different commit.
 
 ### 3. Use either procedure independently
 

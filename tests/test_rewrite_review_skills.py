@@ -181,6 +181,10 @@ class ReviewFindingExampleTest(unittest.TestCase):
                 self.assertFalse(immutable_probe_passes())
                 git("update-index", f"--no-{flag}", "service.py")
                 git("checkout", "--", "service.py")
+            git("replace", revisions["current"], revisions["repaired"])
+            self.assertFalse(immutable_probe_passes(),
+                             "replacement refs must not substitute a different commit")
+            git("replace", "-d", revisions["current"])
             git("checkout", "--detach", revisions["repaired"])
             self.assertFalse(immutable_probe_passes())  # Still proving pinned C.
             proof_env["VERIFIED_SHA"] = revisions["repaired"]

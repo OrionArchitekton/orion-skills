@@ -54,16 +54,18 @@ the Git object, not the working tree:
 ```sh
 : "${TMPDIR:?Set an explicit temporary root outside the checkout}"
 test -n "${VERIFIED_SHA:-}" || exit 1
-proof_commit=$(git rev-parse --verify --end-of-options "${VERIFIED_SHA}^{commit}") || exit 1
+proof_commit=$(git --no-replace-objects rev-parse --verify --end-of-options "${VERIFIED_SHA}^{commit}") || exit 1
 test "$proof_commit" = "$VERIFIED_SHA" || exit 1
 proof_dir=$(mktemp -d "$TMPDIR/review-proof-XXXXXX") || exit 1
-git show "$proof_commit:service.py" > "$proof_dir/service.py" || exit 1
+git --no-replace-objects show "$proof_commit:service.py" > "$proof_dir/service.py" || exit 1
 printf '%s\n' "$proof_dir/service.py"
 ```
 
 Run the Python probe against the returned module path in an isolated process,
 not against an import from the original checkout. At C it still fails even if
 local repaired bytes are staged or hidden by `assume-unchanged`/`skip-worktree`.
+Object reads explicitly disable replacement refs so a different commit cannot
+be substituted for the named SHA.
 At F it passes. An unknown SHA, missing module or Git error blocks proof; never
 fall back to working-tree source. The shell recipe alone is not a behavioral
 test. It grants no commit authority.
