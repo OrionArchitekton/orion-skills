@@ -25,7 +25,11 @@ happy path, matching fields or unchanged guard counts cannot establish that.
    denial and evidence that no protected effect occurred. Also exercise the
    allowed case. A raised exception after a write is a failed guard.
 5. Record commands, revisions, observed effects and remaining uncertainty in a
-   guard ledger. Re-read the final candidate after repairs. Accept only when
+   guard ledger. Identify the tested bytes: use immutable source or verify
+   that the isolated worktree matches the reported revision before and after
+   checks. Label uncommitted proof with its patch/tree identity, not as proof
+   that HEAD contains the change. Re-read the final candidate after repairs.
+   Accept only when
    every relevant guard has binding evidence; otherwise report the precise gap.
 
 Textual searches and optional external diff tools are advisory. They can miss

@@ -49,9 +49,15 @@ Keep a ledger with finding ID/author, reviewed SHA, current SHA, current locatio
 disposition, reason, commands/results, final verification SHA and remaining action.
 Retain contradictory evidence. Missing or failed checks leave the item unverified.
 For each fix, re-read the actual defect site after the change and run the
-repository's relevant checks. Recheck target identity before reporting; if it
-advances, revalidate affected evidence and record the new SHA. A commit or a
-stale-thread marker alone is insufficient.
+repository's relevant checks. Bind results to the tested bytes: before claiming
+resolution at a commit SHA, test that immutable revision or verify that the
+isolated worktree matches it before and after checks, including staged,
+unstaged and untracked source. The worked ledger includes a Git identity gate.
+For an uncommitted repair, retain its patch/tree identity, label the result
+local/uncommitted and do not claim HEAD contains the fix. This grants no commit
+authority. Recheck target identity before reporting; if it advances, revalidate
+affected evidence and record the new SHA. A commit or a stale-thread marker
+alone is insufficient.
 
 [The worked ledger](references/finding-ledger-example.md) covers current-valid,
 stale, already-fixed, disputed, inapplicable and policy-gated findings. It also

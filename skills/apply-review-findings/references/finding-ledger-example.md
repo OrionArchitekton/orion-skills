@@ -46,6 +46,26 @@ Run the same probe against C and F: failure at C reproduces the finding; success
 at F supports its repair. Recheck the target SHA afterward. If the target has
 advanced, inspect the affected behavior again before claiming it is resolved.
 
+For a commit-specific claim, set and export `VERIFIED_SHA` to the full commit
+being tested, then run this read-only gate immediately before and after the
+checks in an isolated checkout. Keep generated logs outside the checkout.
+
+```sh
+checked_sha=$(git rev-parse --verify HEAD) || exit 1
+checked_status=$(git status --porcelain=v1 --untracked-files=all --ignore-submodules=none) || exit 1
+test -n "${VERIFIED_SHA:-}" &&
+test "$checked_sha" = "$VERIFIED_SHA" &&
+test -z "$checked_status"
+```
+
+Any command failure or nonzero gate result blocks a commit-specific resolution
+claim. The gate does not run the behavioral checks or authorize committing.
+Record the check environment and dependencies as well. Uncommitted `service.py`
+can pass the probe while `git show HEAD:service.py` still accepts overflow;
+staging it does not fix the attribution. Preserve the uncommitted patch/tree
+identity and label that proof local until an authorized immutable revision
+contains it. A clean checkout at a different SHA also fails the identity gate.
+
 If the reviewed PR has merged, record `needs-new-vehicle` for the repair work
 before editing. Keep the per-finding substantive decisions above as evidence,
 and prepare an authorized follow-up from the current target. Do not push the

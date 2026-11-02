@@ -137,6 +137,38 @@ class ReviewFindingExampleTest(unittest.TestCase):
             # There is no remote, provider or review-thread mutation to exercise.
             self.assertEqual(git("remote").stdout, "")
 
+            # The same probe can pass on uncommitted bytes while HEAD is unsafe.
+            # Exercise the published identity gate, not a parallel validator.
+            gate = re.findall(r"```sh\n(.*?)\n```", worked.read_text(), re.S)[0]
+            git("checkout", "--detach", revisions["current"])
+            gate_env = {**env, "VERIFIED_SHA": revisions["current"]}
+
+            def identity_gate():
+                return subprocess.run(["bash", "-e", "-c", gate], cwd=repo,
+                                      env=gate_env, text=True, capture_output=True)
+
+            self.assertEqual(identity_gate().returncode, 0)
+            shutil.copyfile(fixture / "repaired.py", repo / "service.py")
+            dirty = runpy.run_path(str(repo / "service.py"))
+            exec(probe, dirty)  # Passing probe is not evidence about current SHA.
+            self.assertEqual(git("rev-parse", "HEAD").stdout.strip(), revisions["current"])
+            self.assertNotEqual(identity_gate().returncode, 0)
+            git("add", "--", "service.py")
+            self.assertNotEqual(identity_gate().returncode, 0)  # Staged is uncommitted too.
+            git("reset", "--hard", revisions["current"])
+            extra = repo / "new_entry.py"
+            extra.write_text("# new untracked entry point\n")
+            self.assertNotEqual(identity_gate().returncode, 0)
+            extra.unlink()
+            git("checkout", "--detach", revisions["repaired"])
+            self.assertNotEqual(identity_gate().returncode, 0)  # Target advanced.
+            gate_env["VERIFIED_SHA"] = revisions["repaired"]
+            self.assertEqual(identity_gate().returncode, 0)
+            outside = subprocess.run(["bash", "-e", "-c", gate], cwd=root,
+                                     env={**env, "VERIFIED_SHA": ""},
+                                     text=True, capture_output=True)
+            self.assertNotEqual(outside.returncode, 0, "Git errors cannot become clean evidence")
+
 
 class StandaloneProcedureTest(unittest.TestCase):
     def errors(self, directory):

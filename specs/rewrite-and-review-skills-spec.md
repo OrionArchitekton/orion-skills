@@ -63,6 +63,13 @@ If the target advances again, affected findings are revalidated. An old finding
 never authorizes weakening a stronger current invariant, pushing a merged branch,
 posting a reply or resolving a remote review thread.
 
+Commit-specific evidence must come from the named immutable source or a
+matching isolated checkout before and after checks. A passing uncommitted repair
+cannot establish that HEAD contains the repair, even if staged. Local uncommitted
+proof retains its patch/tree identity and is labeled accordingly; this creates
+no authority to commit. The synthetic scenario rejects unstaged/staged repairs,
+new untracked source and a different clean revision for a pinned-SHA claim.
+
 ### 3. Use either procedure independently
 
 A consumer copies one skill directory to a temporary location with no other
