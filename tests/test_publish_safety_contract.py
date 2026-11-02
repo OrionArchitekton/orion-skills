@@ -143,13 +143,14 @@ class PublishSafetyContract(unittest.TestCase):
         with publisher("gist") as (m, root, rules):
             rules.write_text("[broken\n")
             client, common = m["gist_client"], m["common"]
-            with patch.object(client, "fetch_public", return_value="Already public note"), \
+            with patch.object(client, "fetch_public", return_value="Already public note") as fetch, \
                  patch.object(client, "create_gist") as create, \
                  patch.object(common, "is_gist_armed", return_value=True), \
                  contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 rc = client.main(["create", "--repo", "o/r", "--path", "f.md",
                                   "--ack-public-hits", "--send"])
             self.assertEqual(rc, 3)
+            fetch.assert_not_called()
             create.assert_not_called()
             self.assertFalse(common.CAPS_PATH.exists())
 

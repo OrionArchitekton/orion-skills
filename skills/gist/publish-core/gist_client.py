@@ -257,6 +257,14 @@ def main(argv) -> int:
         return 2
     description = description or f"From {repo}: {', '.join(paths)}"
 
+    # Refuse known-broken protection before even the unauthenticated source fetch.
+    # The content checks below still reload configuration at the send boundary.
+    import redactor  # local sibling
+    if redactor.custom_load_errors():
+        print("REFUSED: redactor configuration failed; repair it before publishing.", file=sys.stderr)
+        common.log_line("gist REFUSED reason=redactor-config")
+        return 3
+
     # 1. Fetch each path over the PUBLIC raw URL (the already-public proof).
     files = {}
     for p in paths:
