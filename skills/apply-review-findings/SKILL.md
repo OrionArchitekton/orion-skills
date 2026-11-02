@@ -50,9 +50,10 @@ disposition, reason, commands/results, final verification SHA and remaining acti
 Retain contradictory evidence. Missing or failed checks leave the item unverified.
 For each fix, re-read the actual defect site after the change and run the
 repository's relevant checks. Bind results to the tested bytes: before claiming
-resolution at a commit SHA, test that immutable revision or verify that the
-isolated worktree matches it before and after checks, including staged,
-unstaged and untracked source. The worked ledger includes a Git identity gate.
+resolution at a commit SHA, run the checks on source materialized from that
+immutable revision, including all relevant source inputs, without working-tree
+overlays. A clean Git status alone is insufficient: index flags can hide changed
+bytes. The worked ledger demonstrates reading the module from a Git object.
 For an uncommitted repair, retain its patch/tree identity, label the result
 local/uncommitted and do not claim HEAD contains the fix. This grants no commit
 authority. Recheck target identity before reporting; if it advances, revalidate

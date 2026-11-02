@@ -138,36 +138,61 @@ class ReviewFindingExampleTest(unittest.TestCase):
             self.assertEqual(git("remote").stdout, "")
 
             # The same probe can pass on uncommitted bytes while HEAD is unsafe.
-            # Exercise the published identity gate, not a parallel validator.
-            gate = re.findall(r"```sh\n(.*?)\n```", worked.read_text(), re.S)[0]
+            # Execute the published immutable-source recipe, not a validator.
+            recipe = re.findall(r"```sh\n(.*?)\n```", worked.read_text(), re.S)[0]
             git("checkout", "--detach", revisions["current"])
-            gate_env = {**env, "VERIFIED_SHA": revisions["current"]}
+            proof_env = {**env, "VERIFIED_SHA": revisions["current"]}
 
-            def identity_gate():
-                return subprocess.run(["bash", "-e", "-c", gate], cwd=repo,
-                                      env=gate_env, text=True, capture_output=True)
+            def materialize(cwd=repo, overrides=None):
+                return subprocess.run(["bash", "-e", "-c", recipe], cwd=cwd,
+                                      env={**proof_env, **(overrides or {})},
+                                      text=True, capture_output=True)
 
-            self.assertEqual(identity_gate().returncode, 0)
+            def immutable_probe_passes():
+                result = materialize()
+                self.assertEqual(result.returncode, 0, result.stderr)
+                path = Path(result.stdout.strip())
+                self.assertTrue(path.is_relative_to(root))
+                # No checkout import: load the exact module exported from Git.
+                immutable = runpy.run_path(str(path))
+                try:
+                    exec(probe, immutable)
+                except AssertionError:
+                    return False
+                return True
+
+            self.assertFalse(immutable_probe_passes())
             shutil.copyfile(fixture / "repaired.py", repo / "service.py")
             dirty = runpy.run_path(str(repo / "service.py"))
             exec(probe, dirty)  # Passing probe is not evidence about current SHA.
             self.assertEqual(git("rev-parse", "HEAD").stdout.strip(), revisions["current"])
-            self.assertNotEqual(identity_gate().returncode, 0)
+            self.assertFalse(immutable_probe_passes())
             git("add", "--", "service.py")
-            self.assertNotEqual(identity_gate().returncode, 0)  # Staged is uncommitted too.
+            self.assertFalse(immutable_probe_passes())  # Staged is uncommitted too.
             git("reset", "--hard", revisions["current"])
             extra = repo / "new_entry.py"
             extra.write_text("# new untracked entry point\n")
-            self.assertNotEqual(identity_gate().returncode, 0)
+            self.assertFalse(immutable_probe_passes())
             extra.unlink()
+            for flag in ("assume-unchanged", "skip-worktree"):
+                git("update-index", f"--{flag}", "service.py")
+                shutil.copyfile(fixture / "repaired.py", repo / "service.py")
+                self.assertEqual(git("status", "--porcelain").stdout, "")
+                self.assertFalse(immutable_probe_passes())
+                git("update-index", f"--no-{flag}", "service.py")
+                git("checkout", "--", "service.py")
             git("checkout", "--detach", revisions["repaired"])
-            self.assertNotEqual(identity_gate().returncode, 0)  # Target advanced.
-            gate_env["VERIFIED_SHA"] = revisions["repaired"]
-            self.assertEqual(identity_gate().returncode, 0)
-            outside = subprocess.run(["bash", "-e", "-c", gate], cwd=root,
-                                     env={**env, "VERIFIED_SHA": ""},
-                                     text=True, capture_output=True)
-            self.assertNotEqual(outside.returncode, 0, "Git errors cannot become clean evidence")
+            self.assertFalse(immutable_probe_passes())  # Still proving pinned C.
+            proof_env["VERIFIED_SHA"] = revisions["repaired"]
+            self.assertTrue(immutable_probe_passes())
+            self.assertNotEqual(materialize(cwd=root).returncode, 0)
+            self.assertNotEqual(materialize(overrides={"VERIFIED_SHA": ""}).returncode, 0)
+            self.assertNotEqual(materialize(overrides={"VERIFIED_SHA": "0" * 40}).returncode, 0)
+            (repo / "service.py").unlink()
+            git("add", "--", "service.py")
+            git("-c", "core.hooksPath=/dev/null", "commit", "-m", "remove synthetic module")
+            proof_env["VERIFIED_SHA"] = git("rev-parse", "HEAD").stdout.strip()
+            self.assertNotEqual(materialize().returncode, 0)
 
 
 class StandaloneProcedureTest(unittest.TestCase):

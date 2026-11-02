@@ -63,12 +63,14 @@ If the target advances again, affected findings are revalidated. An old finding
 never authorizes weakening a stronger current invariant, pushing a merged branch,
 posting a reply or resolving a remote review thread.
 
-Commit-specific evidence must come from the named immutable source or a
-matching isolated checkout before and after checks. A passing uncommitted repair
+Commit-specific evidence must come from the named immutable source, materialized
+without working-tree overlays for every relevant source input. A clean Git
+status cannot establish byte identity. A passing uncommitted repair
 cannot establish that HEAD contains the repair, even if staged. Local uncommitted
 proof retains its patch/tree identity and is labeled accordingly; this creates
-no authority to commit. The synthetic scenario rejects unstaged/staged repairs,
-new untracked source and a different clean revision for a pinned-SHA claim.
+no authority to commit. The synthetic scenario runs the probe on Git-object
+source despite unstaged/staged/untracked files and index flags that conceal
+local repairs. Unknown revisions, missing source and Git errors block proof.
 
 ### 3. Use either procedure independently
 

@@ -25,9 +25,9 @@ happy path, matching fields or unchanged guard counts cannot establish that.
    denial and evidence that no protected effect occurred. Also exercise the
    allowed case. A raised exception after a write is a failed guard.
 5. Record commands, revisions, observed effects and remaining uncertainty in a
-   guard ledger. Identify the tested bytes: use immutable source or verify
-   that the isolated worktree matches the reported revision before and after
-   checks. Label uncommitted proof with its patch/tree identity, not as proof
+   guard ledger. For commit-specific claims, execute against source materialized
+   from that immutable revision without working-tree overlays; a clean Git
+   status can hide changed bytes. Label uncommitted proof with its patch/tree identity, not as proof
    that HEAD contains the change. Re-read the final candidate after repairs.
    Accept only when
    every relevant guard has binding evidence; otherwise report the precise gap.

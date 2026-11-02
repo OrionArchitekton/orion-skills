@@ -47,24 +47,35 @@ at F supports its repair. Recheck the target SHA afterward. If the target has
 advanced, inspect the affected behavior again before claiming it is resolved.
 
 For a commit-specific claim, set and export `VERIFIED_SHA` to the full commit
-being tested, then run this read-only gate immediately before and after the
-checks in an isolated checkout. Keep generated logs outside the checkout.
+being tested and `TMPDIR` to an explicit temporary root outside the checkout.
+This example's entire source seam is one module. Materialize that module from
+the Git object, not the working tree:
 
 ```sh
-checked_sha=$(git rev-parse --verify HEAD) || exit 1
-checked_status=$(git status --porcelain=v1 --untracked-files=all --ignore-submodules=none) || exit 1
-test -n "${VERIFIED_SHA:-}" &&
-test "$checked_sha" = "$VERIFIED_SHA" &&
-test -z "$checked_status"
+: "${TMPDIR:?Set an explicit temporary root outside the checkout}"
+test -n "${VERIFIED_SHA:-}" || exit 1
+proof_commit=$(git rev-parse --verify --end-of-options "${VERIFIED_SHA}^{commit}") || exit 1
+test "$proof_commit" = "$VERIFIED_SHA" || exit 1
+proof_dir=$(mktemp -d "$TMPDIR/review-proof-XXXXXX") || exit 1
+git show "$proof_commit:service.py" > "$proof_dir/service.py" || exit 1
+printf '%s\n' "$proof_dir/service.py"
 ```
 
-Any command failure or nonzero gate result blocks a commit-specific resolution
-claim. The gate does not run the behavioral checks or authorize committing.
-Record the check environment and dependencies as well. Uncommitted `service.py`
-can pass the probe while `git show HEAD:service.py` still accepts overflow;
-staging it does not fix the attribution. Preserve the uncommitted patch/tree
-identity and label that proof local until an authorized immutable revision
-contains it. A clean checkout at a different SHA also fails the identity gate.
+Run the Python probe against the returned module path in an isolated process,
+not against an import from the original checkout. At C it still fails even if
+local repaired bytes are staged or hidden by `assume-unchanged`/`skip-worktree`.
+At F it passes. An unknown SHA, missing module or Git error blocks proof; never
+fall back to working-tree source. The shell recipe alone is not a behavioral
+test. It grants no commit authority.
+
+For a larger consumer, materialize every relevant source input using its approved
+immutable-source method and record the check environment/dependencies. This
+one-module example does not prove a multi-module application or live PR state.
+Uncommitted `service.py` can pass while the named Git object still accepts
+overflow; an empty Git status can hide that difference. Retain the uncommitted
+patch/tree identity and label that proof local until an authorized immutable
+revision contains it. Recheck the current target before reporting: a passing
+historical commit does not establish the behavior of a newer target.
 
 If the reviewed PR has merged, record `needs-new-vehicle` for the repair work
 before editing. Keep the per-finding substantive decisions above as evidence,
