@@ -1,0 +1,9 @@
+[
+  {"id":"F1","location":"charge","claim":"101 must be rejected before append","disposition":"fix"},
+  {"id":"F2","location":"fetch_item -> read_item","claim":"tenant isolation is absent","disposition":"already-satisfied"},
+  {"id":"F3","location":"charge","claim":"-1 must be rejected before append","disposition":"already-satisfied"},
+  {"id":"F4","location":"policy","claim":"unknown policy should fall back","disposition":"decline-non-defect"},
+  {"id":"F5","location":"optional_adapter","claim":"adapter needs validation","disposition":"decline-non-defect"},
+  {"id":"F6","location":"LIMIT","claim":"raise operator-selected limit to 200","disposition":"operator/design-gated"},
+  {"id":"V1","location":"merged PR repair vehicle","claim":"surviving branch can receive F1 fix","disposition":"needs-new-vehicle"}
+]
