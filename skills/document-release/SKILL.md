@@ -3,8 +3,7 @@ name: document-release
 description: |
   Use on a feature branch before a pull request merges, after code changes are
   committed, to check release documentation against the diff. Triggers include
-  "update the docs", "sync documentation", and "prepare release docs". For an
-  already merged change, first prepare a separate documentation branch.
+  "update the docs", "sync documentation", and "prepare release docs".
 ---
 ## Step 0: Detect platform and base branch
 
@@ -50,8 +49,7 @@ branch name wherever the instructions say "the base branch" or `<default>`.
 You are running the `/document-release` workflow on a feature branch with code
 changes committed, while preparing or updating a PR **before it merges**. The
 bundled `/ship` is an optional finish checklist; this skill has no dependency on
-one of its numbered steps. For an already merged release, prepare a separate docs
-branch against the current base and review the relevant release diff explicitly.
+one of its numbered steps.
 Follow the repository's `AGENTS.md` or `CLAUDE.md` and the current request for
 commit, push and PR-metadata authority; prepare local edits when outward actions
 are outside that authority. Your job: ensure every documentation file
