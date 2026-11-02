@@ -6,7 +6,8 @@ fail() { printf '%s\n' "office-hours: $*; skip private state writes" >&2; exit 1
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || fail 'a Git worktree is required'
 EXCLUDE=$(git -C "$ROOT" rev-parse --git-path info/exclude) || fail 'cannot resolve exclusion file'
 case "$ROOT$EXCLUDE" in *$'\n'*|*$'\r'*) fail 'invalid Git path' ;; esac
-[ -n "$ROOT" ] && [ -n "$EXCLUDE" ] || fail 'empty Git path'
+[ -n "$ROOT" ] || fail 'empty worktree path'
+[ -n "$EXCLUDE" ] || fail 'empty exclusion path'
 case "$EXCLUDE" in /*) ;; *) EXCLUDE="$ROOT/$EXCLUDE" ;; esac
 [ ! -L "$EXCLUDE" ] || fail 'exclusion file is a symlink'
 [ ! -e "$EXCLUDE" ] || [ -f "$EXCLUDE" ] || fail 'exclusion path is not a regular file'
@@ -14,6 +15,8 @@ STATE_ROOT="$ROOT/.office-hours"
 [ ! -L "$STATE_ROOT" ] || fail 'state directory is a symlink'
 [ ! -L "$STATE_ROOT/builder-profile.jsonl" ] || fail 'profile is a symlink'
 [ ! -L "$STATE_ROOT/builder-journey.md" ] || fail 'journey is a symlink'
+[ ! -L "$STATE_ROOT/analytics" ] || fail 'analytics directory is a symlink'
+[ ! -L "$STATE_ROOT/analytics/skill-usage.jsonl" ] || fail 'analytics file is a symlink'
 TRACKED=$(git -C "$ROOT" ls-files -- .office-hours) || fail 'cannot check tracked state'
 [ -z "$TRACKED" ] || fail 'private state is already tracked'
 mkdir -p -- "$(dirname -- "$EXCLUDE")" || fail 'cannot create exclusion parent'
