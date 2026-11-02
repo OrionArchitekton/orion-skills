@@ -51,6 +51,9 @@ tests, and shell syntax check. Run them with disposable HOME/config/ledger paths
 and no inherited credentials. Publishing, authentication, delegation and research
 tests use fakes/stubs; no provider call, send, user install or native research
 execution is part of release qualification.
+Git-based fixtures must bound discovery to their disposable root, even when
+HOME or TMPDIR lies beneath a real checkout; isolation must not depend on `/tmp`
+being outside Git.
 
 Run the full checks again after any source repair. Review the actual nonempty
 diff for correctness, compatibility and security; record exact reviewed SHA and

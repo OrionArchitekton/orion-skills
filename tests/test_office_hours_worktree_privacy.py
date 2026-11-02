@@ -3,6 +3,7 @@
 Use unittest so the repository's CI entrypoint exercises these consumer recipes
 as well as the pytest entrypoint declared in AGENTS.md.
 """
+import json
 import os
 from pathlib import Path
 import re
@@ -32,6 +33,18 @@ def append_profile(repo, env):
                repo, env, check=False)
 
 
+def analytics_recipes():
+    """Execute every published analytics writer, not just one reference snippet."""
+    for document in sorted(SKILL.parent.rglob('*.md')):
+        for block in re.findall(r'```bash\n(.*?)\n```', document.read_text(), re.S):
+            if 'ANALYTICS_DIR=' not in block:
+                continue
+            target = re.search(r'\$ANALYTICS_DIR/([a-z-]+\.jsonl)', block).group(1)
+            block = block.replace('<SKILL_DIR>', str(SKILL.parent))
+            block = re.sub(r'\b(?:ITERATIONS|FOUND|FIXED|REMAINING|SCORE|NUM_RESOURCES)\b', '1', block)
+            yield document.name, target, block
+
+
 class OfficeHoursWorktreePrivacyTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="office hours privacy ")
@@ -41,7 +54,8 @@ class OfficeHoursWorktreePrivacyTest(unittest.TestCase):
         home.mkdir()
         self.env = {"PATH": os.environ["PATH"], "HOME": str(home),
                     "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
-                    "GIT_CONFIG_COUNT": "0"}
+                    "GIT_CONFIG_COUNT": "0",
+                    "GIT_CEILING_DIRECTORIES": str(self.root)}
 
     def repository(self, name="ordinary repo with spaces"):
         repo = self.root / name
@@ -132,6 +146,46 @@ class OfficeHoursWorktreePrivacyTest(unittest.TestCase):
         result = run(["bash", "--noprofile", "--norc", "-c", block.replace("<SKILL_DIR>", str(SKILL.parent))], repo, self.env, False)
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse((repo / ".office-hours/analytics/skill-usage.jsonl").exists())
+
+    def test_all_analytics_writers_refuse_unprotected_or_redirected_state(self):
+        for document, target, block in analytics_recipes():
+            for failure in ('exclusion', 'outside-git', 'target-symlink'):
+                with self.subTest(document=document, target=target, failure=failure):
+                    repo = self.root / f'outside-{document}-{failure}'
+                    if failure == 'outside-git':
+                        repo.mkdir()
+                    else:
+                        repo = self.repository(f'{document}-{failure}')
+                    outside = self.root / f'{document}-{failure}-preserved'
+                    outside.write_text('existing synthetic state\n')
+                    if failure == 'exclusion':
+                        (repo / '.git/info/exclude').mkdir()
+                    if failure == 'target-symlink':
+                        destination = repo / '.office-hours/analytics' / target
+                        destination.parent.mkdir(parents=True)
+                        destination.symlink_to(outside)
+                    result = run(['bash', '--noprofile', '--norc', '-c', block], repo, self.env, False)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(outside.read_text(), 'existing synthetic state\n')
+                    if failure != 'target-symlink':
+                        self.assertFalse((repo / '.office-hours').exists())
+
+    def test_all_analytics_writers_persist_ignored_metrics_in_both_worktree_types(self):
+        for linked in (False, True):
+            ordinary = self.repository(f'analytics-{linked}')
+            repo = ordinary
+            if linked:
+                repo = self.root / 'analytics-linked'
+                run(['git', 'worktree', 'add', '--detach', str(repo)], ordinary, self.env)
+            for document, target, block in analytics_recipes():
+                with self.subTest(linked=linked, document=document, target=target):
+                    result = run(['bash', '--noprofile', '--norc', '-c', block], repo, self.env, False)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    destination = repo / '.office-hours/analytics' / target
+                    self.assertEqual(json.loads(destination.read_text())['skill'],
+                                     'SKILL_NAME' if target == 'eureka.jsonl' else 'office-hours')
+                    self.assertEqual(run(['git', 'check-ignore', '-q', str(destination)], repo, self.env, False).returncode, 0)
+            self.assertEqual(run(['git', 'status', '--porcelain', '--untracked-files=all'], repo, self.env).stdout, '')
 
 
 if __name__ == "__main__":

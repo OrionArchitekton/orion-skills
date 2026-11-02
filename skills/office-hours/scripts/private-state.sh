@@ -17,6 +17,8 @@ STATE_ROOT="$ROOT/.office-hours"
 [ ! -L "$STATE_ROOT/builder-journey.md" ] || fail 'journey is a symlink'
 [ ! -L "$STATE_ROOT/analytics" ] || fail 'analytics directory is a symlink'
 [ ! -L "$STATE_ROOT/analytics/skill-usage.jsonl" ] || fail 'analytics file is a symlink'
+[ ! -L "$STATE_ROOT/analytics/spec-review.jsonl" ] || fail 'review metrics file is a symlink'
+[ ! -L "$STATE_ROOT/analytics/eureka.jsonl" ] || fail 'insight metrics file is a symlink'
 TRACKED=$(git -C "$ROOT" ls-files -- .office-hours) || fail 'cannot check tracked state'
 [ -z "$TRACKED" ] || fail 'private state is already tracked'
 mkdir -p -- "$(dirname -- "$EXCLUDE")" || fail 'cannot create exclusion parent'

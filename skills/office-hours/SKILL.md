@@ -489,7 +489,8 @@ After the loop completes (PASS, max iterations, or convergence guard):
 
 3. Append metrics:
 ```bash
-ANALYTICS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours/analytics"
+STATE_ROOT="$(bash "<SKILL_DIR>/scripts/private-state.sh")" || exit 1
+ANALYTICS_DIR="$STATE_ROOT/analytics"
 mkdir -p "$ANALYTICS_DIR"
 echo '{"skill":"office-hours","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","iterations":ITERATIONS,"issues_found":FOUND,"issues_fixed":FIXED,"remaining":REMAINING,"quality_score":SCORE}' >> "$ANALYTICS_DIR/spec-review.jsonl" 2>/dev/null || true
 ```
