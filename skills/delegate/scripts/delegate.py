@@ -13,7 +13,7 @@ tool calls). Security rails are enforced in code and asserted by tests:
   - NEVER emits a sandbox-bypass flag (see BYPASS_FLAGS);
   - scrubs the child env to a least-privilege WHITELIST (no sibling-provider keys, no
     GH/Slack/secret-manager tokens, no ANTHROPIC key);
-  - resolves child CLIs by ABSOLUTE path (no bare-PATH planted-binary shadow);
+  - checks child CLIs against known POSIX installation locations before launch;
   - defaults the codex sandbox to read-only (workspace-write only on explicit opt-in);
   - codex stdin is /dev/null (guards the >=0.120 non-TTY exec deadlock).
 
@@ -26,10 +26,12 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 TARGETS = frozenset({"codex", "grok", "gemma"})
 
@@ -69,12 +71,70 @@ class DelegateError(Exception):
     """Raised on an unknown target, a missing CLI, or an invalid delegation request."""
 
 
+def _installation_paths():
+    """Explicit trust anchors; HOME and PATH cannot add installation locations."""
+    try:
+        import pwd
+        uid = os.getuid()
+        home = Path(pwd.getpwuid(uid).pw_dir)
+    except (ImportError, KeyError, AttributeError) as exc:
+        raise DelegateError("CLI resolution requires a POSIX account home") from exc
+    return [
+        (Path('/usr/bin'), Path('/usr'), {0}),
+        (Path('/usr/local/bin'), Path('/usr'), {0}),
+        (Path('/bin'), Path('/usr'), {0}),
+        (Path('/bin'), Path('/bin'), {0}),  # systems without merged /usr
+        (home / '.local/bin', home / '.local', {0, uid}),
+        (home / '.npm-global/bin', home / '.npm-global', {0, uid}),
+    ]
+
+
+def _checked_realpath(path: Path, owners: set, hops: int = 0) -> Path:
+    """Check every ancestor and symlink hop, including intermediate link targets."""
+    if hops > 40:
+        raise DelegateError("CLI symlink chain is too deep or cyclic")
+    current = Path(path.anchor)
+    for index, part in enumerate(path.parts):
+        if index:
+            current = current.parent if part == '..' else current / part
+        info = current.lstat()
+        if info.st_uid not in owners:
+            raise DelegateError("CLI path is owned by an untrusted account")
+        if stat.S_ISLNK(info.st_mode):
+            link = Path(os.readlink(current))
+            target = link if link.is_absolute() else current.parent / link
+            # Inspect the link's destination before the remaining path. Do not collapse
+            # '..' across a symlink: kernel traversal follows that symlink first.
+            resolved = _checked_realpath(target, owners, hops + 1)
+            remaining = path.parts[index + 1:]
+            return _checked_realpath(resolved.joinpath(*remaining), owners, hops + 1)
+        if info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+            raise DelegateError("CLI path is writable by group or other accounts")
+        if index < len(path.parts) - 1 and not stat.S_ISDIR(info.st_mode):
+            raise DelegateError("CLI path traverses a non-directory")
+    return current
+
+
 def resolve_cli(name: str) -> str:
-    """Absolute path to a child CLI, or raise. Never return a bare name (planted-binary shadow)."""
+    """Resolve only from checked installation locations; an absolute PATH hit is not trust."""
     path = shutil.which(name)
     if not path:
         raise DelegateError(f"CLI not found on PATH: {name!r}")
-    return os.path.abspath(path)
+    candidate = Path(path)
+    if not candidate.is_absolute() or '..' in candidate.parts:
+        raise DelegateError("CLI resolution must be absolute, without parent traversal")
+    cwd = Path.cwd().resolve()
+    try:
+        for launcher, root, owners in _installation_paths():
+            if candidate.parent != launcher or candidate.parent == cwd:
+                continue
+            resolved = _checked_realpath(candidate, owners)
+            if (resolved.is_relative_to(root) and resolved.parent != cwd
+                    and resolved.is_file() and os.access(resolved, os.X_OK)):
+                return str(resolved)
+    except OSError as exc:
+        raise DelegateError("CLI installation could not be verified") from exc
+    raise DelegateError(f"CLI is outside checked installation locations: {name!r}")
 
 
 def _assert_no_bypass(argv: list) -> list:

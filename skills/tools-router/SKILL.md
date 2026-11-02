@@ -18,7 +18,8 @@ AUTH-AWARE and SECRET-SAFE.** Two planes:
 2. A **thin, fail-open session injector** that injects the pre-rendered index and does no probing.
 
 The split is load-bearing: probing is slow and secret-bearing, so it must never run on the
-session hot path; the injector just reads a cached artifact and assumes-authed (the recon earns that).
+session hot path; the injector relays the cached evidence states. A cached `authed` result is
+point-in-time evidence, not a guarantee of present access; recheck when stale or a call fails.
 
 ## When to use
 
@@ -78,9 +79,23 @@ is *indeterminate*, not unauthed). Two specific traps:
 
 - **config-present ≠ auth-verified.** A local-config read tells you a key is *stored*, not that it's
   *live*, it cannot detect a revoked/expired key. Mark it `config_present`, not `authed`.
+  A nonempty environment variable is also only `config_present`; an absent or empty one is
+  `indeterminate` because the probe may lack the target's runtime environment. Neither is a
+  verified-working CLI or grounds to remove an MCP.
 - **masked-failure.** `probe-command || version-command` always exits 0 (the fallback fires on
   failure and succeeds), so RC reports "authed" even with no credential. Use an affirmative
-  predicate ("found a logged-in marker"), never "didn't see an error."
+  predicate ("found a logged-in marker") **AND a successful exit**, never "didn't see an error."
+  A failed probe with a stale affirmative marker is `unauthed`; a successful probe with
+  unknown output is `indeterminate`. Missing executables are `not_installed` and are never run.
+
+The skeleton checks the non-JSON `gh auth status` success entry in the combined output
+streams. Its [CLI contract](https://cli.github.com/manual/gh_auth_status) and
+[output implementation](https://github.com/cli/cli/blob/trunk/pkg/cmd/auth/status/status.go)
+describe the status and marker; JSON mode has a different exit contract. The fake `cloudcli`
+and `vendorcli` examples assume `* <account>` and a JSON object with a nonempty `login`,
+respectively. Replace those contracts with your tool's documented positive signal, test
+unknown/version-drifted output, and never infer authentication from exit 0 alone. Scope the
+probe to the intended host/account before relying on its result for that destination.
 
 ## Reference implementation
 

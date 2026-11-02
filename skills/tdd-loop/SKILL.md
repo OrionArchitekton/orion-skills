@@ -102,7 +102,9 @@ the PR does not open while any BLOCKING finding is open OR the suite is red.**
 - **Security gate (BLOCKING-as-hard-gate)**: run the diff through the security
   checklist below; any BLOCKING finding blocks the PR. Loop-until clean.
 - **Secret gate**: independently re-run your secret scanner on the staged set and
-  assert it produced a CLEAN report (report file exists, exit 0). A scanner that errors,
+  assert successful exit AND a parseable report in the scanner's expected schema with
+  zero findings. File existence (including a precreated empty file) is not clean evidence.
+  Missing, empty, malformed, wrong-shaped or positive-finding reports block. A scanner that errors,
   times out, or runs outside the repo can fail OPEN, so a non-blocking advisory counts
   as NOT green here. Escape a false positive via the scanner's allow mechanism, **never**
   by bypassing the commit hook past a real finding.
