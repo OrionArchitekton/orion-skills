@@ -6,6 +6,37 @@ an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
 
 ## [Unreleased]
 
+Proposed maintenance version: **0.6.1**, subject to compatibility acceptance and
+resolution of the research implementation's origin/redistribution evidence.
+No release or tag has been created. The collection retains 27 skills.
+
+### Fixed
+
+- X and Gist refuse invalid or unreadable safety configuration, preserve damaged
+  cap ledgers, and check the exact outbound text before reserving a send. The
+  denylist remains one Python regex per line, including JSON-looking regexes.
+- Tool routing requires affirmative authentication evidence; configured keys and
+  successful commands with unknown output do not establish access. The TDD
+  scanner example requires exit zero and a parsed empty findings array.
+- Office-hours checks Git's exclusion path in ordinary and linked worktrees
+  before profile, journey and analytics writes.
+
+### Changed
+
+- Task-scoped handoff guidance preserves task identity and checkpoints, verifies
+  the accepted baseline, and refuses ambiguous legacy pickup.
+- Release documentation runs on the feature branch before merge. Pre-PR review
+  maps changed behavior to tests or worked scenarios.
+- Adapted skills retain upstream and Orion notices in standalone copies. Research
+  docs name executor prerequisites and the unresolved collection release hold.
+- Delegate documentation corrects the absolute-path trust claim. A stricter
+  installation policy is deferred for an explicit platform/layout and version
+  decision; this candidate preserves existing executable-selection behavior.
+- CI runs pinned Python checks, bundled Node tests, X/Gist selftests, and narrow
+  source/README/mandatory-file distribution contracts.
+
+Release preparation and verification: [operator runbook](docs/runbooks/orion-skills-release.md).
+
 ## [0.6.0] - 2026-09-28
 
 Catalog has grown from 26 skills to 27.

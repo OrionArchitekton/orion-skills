@@ -1,0 +1,23 @@
+# Source and modifications
+
+This skill includes material adapted from [garrytan/gstack](https://github.com/garrytan/gstack)
+under the MIT license. Keep [LICENSE.gstack](LICENSE.gstack) with a copy of this
+skill directory. [LICENSE.orion](LICENSE.orion) preserves Dan Mercede's
+collection copyright and MIT notice for Orion's modifications. These notices
+travel together in a standalone skill copy.
+
+Verified comparison revision: `4f435e45c517822014a852804c3da57bab121516`
+(2026-03-26). [Source skill](https://github.com/garrytan/gstack/blob/4f435e45c517822014a852804c3da57bab121516/document-release/SKILL.md).
+Files with upstream lineage: `SKILL.md`, `references/preamble.md`.
+The comparison revision is a reproducible source reference; the exact revision
+used during the original port was not recorded and is not inferred from similarity.
+
+Orion import: `c6bc3fff94a4a79cc7133141ad34758262a1d780` (2026-07-06).
+The port removed fabricated persona endorsements, extracted supporting references,
+and adapted the internal workflow for portable use. Follow-up commits
+`59dd9652a4842941e2ac21cb73c5b387d0fd9560`,
+`5db495335107fc08b037db610443ef61c81e334c`, and
+`92ee5f0d7a81dfa9b084527e743bc6ea90c7dad6` record subsequent review,
+portability and state-handling repairs across these families.
+
+Current maintenance aligns the trigger with pre-merge documentation review and removes an inapplicable ship-step reference.

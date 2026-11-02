@@ -13,7 +13,7 @@ tool calls). Security rails are enforced in code and asserted by tests:
   - NEVER emits a sandbox-bypass flag (see BYPASS_FLAGS);
   - scrubs the child env to a least-privilege WHITELIST (no sibling-provider keys, no
     GH/Slack/secret-manager tokens, no ANTHROPIC key);
-  - resolves child CLIs by ABSOLUTE path (no bare-PATH planted-binary shadow);
+  - retains an absolute PATH selection (not an executable trust check);
   - defaults the codex sandbox to read-only (workspace-write only on explicit opt-in);
   - codex stdin is /dev/null (guards the >=0.120 non-TTY exec deadlock).
 
@@ -70,7 +70,7 @@ class DelegateError(Exception):
 
 
 def resolve_cli(name: str) -> str:
-    """Absolute path to a child CLI, or raise. Never return a bare name (planted-binary shadow)."""
+    """Absolute PATH selection, or raise. This is not an executable trust check."""
     path = shutil.which(name)
     if not path:
         raise DelegateError(f"CLI not found on PATH: {name!r}")

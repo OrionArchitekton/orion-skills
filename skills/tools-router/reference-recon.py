@@ -9,10 +9,10 @@ your environment, this is a teaching skeleton, not drop-in code.
 Run it OUT of band (a timer/cron/CI job), never on the session hot path.
 """
 from __future__ import annotations
-import os, re, shutil, subprocess
+import json, os, re, shutil, subprocess
 
 # --- secret redaction: belt-and-suspenders. The PRIMARY defense is never capturing raw
-#     probe stdout (see probe_cli); this scrubs any field before it is rendered. ----------
+#     probe output on disk (see probe_cli); this scrubs any field before rendering. -------
 _SECRET = [
     re.compile(r"\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{3,}"),   # provider key shapes
     re.compile(r"(?i)\b\w*(?:API[_-]?KEY|SECRET|TOKEN|PASSWORD)\b\s*[:=]\s*\S+"),
@@ -25,24 +25,48 @@ def redact(s: str) -> str:
 
 # --- per-tool auth detection: NON-uniform. Each predicate is AFFIRMATIVE (find a
 #     logged-in marker) over exit code AND a content signal: never "no error seen". ------
-def authed_if_rc0(rc, out):           return "authed" if rc == 0 else "unauthed"
-def authed_if_active_marker(rc, out): return "authed" if any(l.lstrip().startswith("*") for l in out.splitlines()) else "unauthed"
+def authed_if_gh_status(rc, out):
+    if rc != 0:
+        return "unauthed"
+    # gh's non-JSON success entry; unknown/version-drifted text stays unverified.
+    marker = r"(?m)^[ \t]*(?:[✓✔][ \t]+)?Logged in to \S+ (?:account|as) \S+"
+    return "authed" if re.search(marker, out) else "indeterminate"
+
+def authed_if_identity(rc, out):
+    if rc != 0:
+        return "unauthed"
+    # Placeholder vendorcli contract: whoami emits JSON with a nonempty login.
+    try:
+        identity = json.loads(out)
+    except (ValueError, TypeError):
+        return "indeterminate"
+    login = identity.get("login") if isinstance(identity, dict) else None
+    return "authed" if isinstance(login, str) and login.strip() else "indeterminate"
+
+def authed_if_active_marker(rc, out):
+    if rc != 0:
+        return "unauthed"
+    # Placeholder cloudcli contract: one active row is exactly '* <account>'.
+    return "authed" if re.search(r"(?m)^[ \t]*\*[ \t]+\S+[ \t]*$", out) else "indeterminate"
 def authed_if_config(rc, out):        return "config_present" if (rc == 0 and "[default]" in out) else "no_config"  # local read != live auth
-def authed_env(var):                  return "authed" if os.environ.get(var) else "indeterminate"  # env-var auth: indeterminate without the runtime env
+def authed_env(var):                  return "config_present" if os.environ.get(var) else "indeterminate"  # presence is not a live authentication check
 
 # probe = (argv, detector, secret_bearing). secret_bearing probes never return their stdout.
 # Tool names below are obviously-fake placeholders (except `gh`, a ubiquitous public example): # substitute your real CLIs.
 PROBES = {
-    "gh":        (["gh", "auth", "status"],          authed_if_rc0,           False),
+    "gh":        (["gh", "auth", "status"],          authed_if_gh_status,     False),
     "cloudcli":  (["cloudcli", "auth", "list"],      authed_if_active_marker, False),  # rc0 even w/ 0 accounts -> parse the marker
     "paycli":    (["paycli", "config", "--list"],    authed_if_config,        True),   # PRINTS keys -> secret_bearing
-    "vendorcli": (["vendorcli", "whoami"],           authed_if_rc0,           False),
+    "vendorcli": (["vendorcli", "whoami"],           authed_if_identity,      False),
     # env-var-auth tools are handled out of band (see build_inventory).
 }
 
 def _run(argv, timeout=12):
     try:
-        p = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        # gh auth status writes its identity entries to stderr. Inspect both streams
+        # only in memory; probe_cli never returns this raw, potentially sensitive text.
+        p = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                           text=True, timeout=timeout)
         return p.returncode, p.stdout
     except Exception:
         return 124, ""  # timeout/crash -> never reads as authed

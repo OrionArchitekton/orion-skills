@@ -59,10 +59,7 @@ def test_redactor_custom_loader():
     print("redactor (custom denylist file):")
     with tempfile.TemporaryDirectory() as td:
         cfg = Path(td) / "x-denylist.txt"
-        # last line is a malformed regex (unterminated character set), it must be
-        # SKIPPED (the valid lines still load) but surfaced as a load error, not
-        # silently dropped (a silent skip is a hole in a fail-closed guard).
-        cfg.write_text("# my org\n\\bACME\\b\nmybox-01\n[unclosed\n")
+        cfg.write_text("# my org\n\\bACME\\b\nmybox-01\n")
         orig = redactor.CUSTOM_PATH
         redactor.CUSTOM_PATH = cfg
         try:
@@ -73,11 +70,11 @@ def test_redactor_custom_loader():
             # a word NOT in the custom file (and not universal) still publishes
             v3, _ = redactor.decision("we shipped the feature on schedule")
             _check("non-listed-publishes", v3 == "PUBLISH")
-            # the malformed line is reported (fail-closed: never a silent skip)
+            cfg.write_text("[unclosed\n")
             errs = redactor.custom_load_errors()
-            _check("malformed-line-surfaced",
-                   len(errs) == 1 and errs[0][1] == "[unclosed",
-                   f"errors={errs}")
+            _check("malformed-line-surfaced", errs == [(1, "invalid-regex")])
+            _check("malformed-rules-block-clean",
+                   redactor.decision("Public note")[0] == "ABSTAIN")
         finally:
             redactor.CUSTOM_PATH = orig
 

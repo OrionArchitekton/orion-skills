@@ -2,7 +2,7 @@
 
 ## Repo Role
 
-`orion-skills` is an open-source library of original agent skills for
+`orion-skills` is a curated library of Orion-authored and adapted agent skills for
 disciplined coding-agent workflows: finishing work, preserving scope, preparing
 PRs, capturing learnings, and writing executable plans.
 

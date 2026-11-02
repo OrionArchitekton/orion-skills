@@ -4,6 +4,12 @@ Depth for `tdd-loop/SKILL.md`. The SKILL.md is the contract; this file is the me
 The gates bind to artifacts regardless of which substrate, independent subagents, a
 deterministic workflow runner, or inline sequential work, you drive the loop with.
 
+Contents: [Diff](#computing-the-diff-the-reviewers-actually-see-review-ran-gate),
+[Review](#reviewer-dispatch-diff-fed-roles-not-products),
+[Secrets](#secret-gate-your-scanner-can-fail-open-re-assert-a-clean-report),
+[Completion](#completion-gate-full-suite-last-capture-the-exit-code),
+[Backflow](#backflow-rule).
+
 ## Substrate (use what your harness has)
 
 - **Independent subagents**: dispatch each slice and each reviewer as a subagent.
@@ -71,15 +77,39 @@ zero BLOCKING findings remain.
 Using [gitleaks](https://github.com/gitleaks/gitleaks) as the example scanner:
 
 ```bash
+# Bash: preserve scanner failure if a logging wrapper uses a pipeline.
+set -o pipefail
 # `gitleaks git --staged` is the current form (replaces the deprecated `protect --staged`)
-REPORT="$(mktemp)"   # fresh, private path, no stale or world-readable report file
+REPORT="$(mktemp)" || { echo "GATE FAIL: could not allocate secrets report"; exit 1; }
+# mktemp precreates a private EMPTY file: its existence is not scanner evidence.
 # `if cmd; then rc=0; else rc=$?` captures the status AND survives `set -e`
-if gitleaks git --staged --redact --report-path "$REPORT"; then rc=0; else rc=$?; fi
+if gitleaks git --staged --redact --report-format json --report-path "$REPORT"; then rc=0; else rc=$?; fi
 # rc 0 = clean; rc 1 = leak found OR scan error (BOTH block: inspect "$REPORT" + stderr to tell apart);
 # any other rc / missing report = scanner error => NOT green (a commit hook would fail OPEN here)
-test -f "$REPORT" || { echo "GATE FAIL: no secrets report produced"; exit 1; }
 [ "$rc" -eq 0 ] || { echo "GATE FAIL: scanner rc=$rc (leak or scan error)"; exit 1; }
+# JSON reports are arrays of findings. Only the empty array is clean. Do not print
+# report contents on failure: even an error fixture may contain unredacted secrets.
+if python3 -I - "$REPORT" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as report_file:
+        findings = json.load(report_file)
+except (OSError, ValueError, UnicodeError):
+    sys.exit(1)
+sys.exit(0 if isinstance(findings, list) and not findings else 1)
+PY
+then :; else echo "GATE FAIL: missing, invalid or non-clean secrets report"; exit 1; fi
 ```
+
+This Bash example requires Python 3. Missing, empty, malformed, wrong-shaped and
+positive-finding reports all block, including when the scanner exits 0. Keep scanner
+status separate from report validation; neither alone proves clean. Invoke the scanner
+directly as above or use a wrapper that returns its failure status. A wrapper using
+`|| true` or an outer pipeline without `pipefail` can erase failure before this gate
+sees it; never use those as evidence. If you pipe the whole gate, enable `pipefail` in
+the calling shell too. Retain the private report for review; remove it when no longer needed.
 
 Never bypass the commit hook past a real finding. `--redact` keeps secret values out of
 stdout, the secret-to-stdout prohibition applies to the scanner's own output too.

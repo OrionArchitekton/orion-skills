@@ -165,7 +165,8 @@ Before building anything unfamiliar, **search first.**
 
 **Eureka:** When first-principles reasoning contradicts conventional wisdom, name it and log:
 ```bash
-ANALYTICS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours/analytics"
+STATE_ROOT="$(bash "<SKILL_DIR>/scripts/private-state.sh")" || exit 1
+ANALYTICS_DIR="$STATE_ROOT/analytics"
 mkdir -p "$ANALYTICS_DIR"
 jq -n --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg skill "SKILL_NAME" --arg branch "$(git branch --show-current 2>/dev/null)" --arg insight "ONE_LINE_SUMMARY" '{ts:$ts,skill:$skill,branch:$branch,insight:$insight}' >> "$ANALYTICS_DIR/eureka.jsonl" 2>/dev/null || true
 ```

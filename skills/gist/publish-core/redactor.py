@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import os
 import re
+import stat
 import sys
 from pathlib import Path
 
@@ -68,39 +69,49 @@ _add("secret", r"\bdp\.[A-Za-z0-9._-]{6,}\b")
 _add("secret", r"\b[A-Za-z0-9_\-]{40,}\b")
 
 
-def _load_custom():
-    """Read the user's external denylist (one regex per line; # = comment).
+class RedactionConfigError(ValueError):
+    """Configured protection could not be loaded; contains no private rules."""
 
-    Returns (patterns, errors) where errors is [(lineno, line, message)] for any
-    line that is not a valid regex. A malformed line is SKIPPED so a single typo
-    cannot crash the guard mid-publish, but the skip must never be silent: a
-    dropped denylist line is a HOLE in a fail-closed guard (the private noun it was
-    meant to catch would publish). `--check` surfaces every error loudly.
+
+def _load_custom():
+    """Return compiled patterns and safe (line, failure class) diagnostics.
+
+    Only an absent default denylist is optional. An explicit path, an existing
+    unreadable input, or any malformed rule blocks the whole guard.
     """
     pats, errors = [], []
     try:
-        for lineno, ln in enumerate(
-                CUSTOM_PATH.read_text(encoding="utf-8").splitlines(), 1):
-            s = ln.strip()
-            if not s or s.startswith("#"):
-                continue
-            try:
-                pats.append(("custom", re.compile(s, re.IGNORECASE)))
-            except re.error as exc:
-                errors.append((lineno, s, str(exc)))
-    except OSError:
-        pass
+        if not stat.S_ISREG(CUSTOM_PATH.stat().st_mode):
+            return pats, [(0, "unreadable-config")]
+        contents = CUSTOM_PATH.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        if "X_DENYLIST_FILE" in os.environ or CUSTOM_PATH.is_symlink():
+            errors.append((0, "missing-config"))
+        return pats, errors
+    except (OSError, UnicodeError):
+        return pats, [(0, "unreadable-config")]
+    for lineno, ln in enumerate(contents.splitlines(), 1):
+        s = ln.strip()
+        if not s or s.startswith("#"):
+            continue
+        try:
+            pats.append(("custom", re.compile(s, re.IGNORECASE)))
+        except (re.error, OverflowError, RecursionError, MemoryError):
+            errors.append((lineno, "invalid-regex"))
     return pats, errors
 
 
 def active_patterns():
-    pats, _ = _load_custom()
+    pats, errors = _load_custom()
+    if errors:
+        raise RedactionConfigError("; ".join(
+            f"denylist line {line}: {kind}" if line else f"denylist: {kind}"
+            for line, kind in errors))
     return _BUILTIN + pats
 
 
 def custom_load_errors():
-    """Malformed (skipped) custom-denylist lines, surfaced loudly by --check so a
-    typo can't silently weaken a fail-closed guard."""
+    """Return safe failure locations/classes, never private patterns."""
     return _load_custom()[1]
 
 
@@ -134,7 +145,10 @@ def redact(text: str) -> str:
 
 def decision(text: str):
     """Fail-closed verdict. ('PUBLISH', []) or ('ABSTAIN', hits)."""
-    hits = scan(text)
+    try:
+        hits = scan(text)
+    except RedactionConfigError as exc:
+        return "ABSTAIN", [("redactor-config", str(exc))]
     return ("ABSTAIN" if hits else "PUBLISH"), hits
 
 
@@ -156,18 +170,16 @@ def main(argv) -> int:
     if len(argv) < 2:
         print("usage: redactor.py --check|--redact <file|->", file=sys.stderr)
         return 2
-    if mode == "--check" and not CUSTOM_PATH.exists():
-        print(f"note: no custom denylist at {CUSTOM_PATH}, only built-in universal "
-              "patterns are active (your hostnames/products/clients are NOT covered). "
-              "Copy x-denylist.sample.txt there and edit it.", file=sys.stderr)
-    if mode == "--check" and CUSTOM_PATH.exists():
-        for lineno, bad, msg in custom_load_errors():
-            print(f"WARNING: denylist {CUSTOM_PATH} line {lineno} is not a valid regex "
-                  f"and was SKIPPED, your guard has a hole here until you fix it: "
-                  f"{bad!r} ({msg})", file=sys.stderr)
+    if mode == "--check" and "X_DENYLIST_FILE" not in os.environ and not CUSTOM_PATH.exists():
+        print("note: no default custom denylist; only built-in universal patterns "
+              "are active. Your private nouns are NOT covered.", file=sys.stderr)
     text = _read_source(argv[1])
     if mode == "--redact":
-        sys.stdout.write(redact(text))
+        try:
+            sys.stdout.write(redact(text))
+        except RedactionConfigError as exc:
+            print(f"ABSTAIN: {exc}", file=sys.stderr)
+            return 3
         return 0
     if mode == "--check":
         verdict, hits = decision(text)

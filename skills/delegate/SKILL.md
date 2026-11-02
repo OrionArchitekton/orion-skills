@@ -59,7 +59,11 @@ delegate.fanout([
   commonly bake those in; this layer exists partly to avoid that.
 - Child env is a least-privilege WHITELIST: base keys + ONLY the target's own key; no
   sibling-provider keys, no GH/Slack/secret-manager/Anthropic tokens.
-- Child CLI resolved by ABSOLUTE path (no planted-binary shadow).
+- Child CLI selection is converted to an absolute path with `shutil.which` before
+  spawning. This preserves the selected path; it does not authenticate the executable.
+  An unsafe or current-directory PATH entry can still select a planted binary.
+  Review PATH and the selected installation before delegation. A stricter installation
+  policy is deferred pending an explicit supported-platform/layout compatibility decision.
 - codex sandbox defaults read-only; `--write` escalates to `workspace-write` (never `danger-full-access`).
 - codex stdin is `/dev/null` (guards the >=0.120 non-TTY exec deadlock).
 - **Rule of Two:** a delegate acting on untrusted input must not also hold private access AND

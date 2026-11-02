@@ -508,12 +508,15 @@ Design trajectory with interpretation:
 "You started this as a side project. But you've named specific users, pushed back when challenged, and your designs keep getting sharper each time. I don't think this is a side project anymore. Have you thought about whether this could be a company?"
 This must feel earned, not broadcast. If the evidence doesn't support it, skip entirely.
 
-**Builder Journey Summary** (session 5+): Auto-generate `.office-hours/builder-journey.md`
-with a narrative arc (not a data table). The arc tells the STORY of their journey in
-second person, referencing specific things they said across sessions. Then open it:
+**Builder Journey Summary** (session 5+): First run the private-state initializer
+below. On failure, skip generation and opening:
 ```bash
-STATE_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours"
-mkdir -p "$STATE_ROOT"
+STATE_ROOT="$(bash "<SKILL_DIR>/scripts/private-state.sh")" || exit 1
+```
+On success, write `$STATE_ROOT/builder-journey.md` with a narrative arc (not a data
+table), telling the story in second person from specific session evidence. Then
+open the completed file with the user's available local opener:
+```bash
 open "$STATE_ROOT/builder-journey.md"
 ```
 
@@ -529,7 +532,9 @@ The data speaks. No pitch needed.
 
 Full accumulated signal summary from the profile.
 
-Auto-generate updated `.office-hours/builder-journey.md` with narrative arc. Open it.
+Run the same private-state initializer before generating the updated
+`$STATE_ROOT/builder-journey.md` with narrative arc, then open it. On initializer
+failure, skip this private write and opening.
 
 Then proceed to Founder Resources below.
 
@@ -616,14 +621,14 @@ PAUL GRAHAM ESSAYS:
 1. Log the selected resource URLs to the builder profile (single source of truth).
 Append a resource-tracking entry:
 ```bash
-STATE_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours"
-mkdir -p "$STATE_ROOT"
+STATE_ROOT="$(bash "<SKILL_DIR>/scripts/private-state.sh")" || exit 1
 echo '{"date":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'","mode":"resources","project_slug":"'"${SLUG:-unknown}"'","signal_count":0,"signals":[],"design_doc":"","assignment":"","resources_shown":["URL1","URL2","URL3"],"topics":[]}' >> "$STATE_ROOT/builder-profile.jsonl"
 ```
 
 2. Log the selection to analytics:
 ```bash
-ANALYTICS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours/analytics"
+STATE_ROOT="$(bash "<SKILL_DIR>/scripts/private-state.sh")" || exit 1
+ANALYTICS_DIR="$STATE_ROOT/analytics"
 mkdir -p "$ANALYTICS_DIR"
 echo '{"skill":"office-hours","event":"resources_shown","count":NUM_RESOURCES,"categories":"CAT1,CAT2","ts":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}' >> "$ANALYTICS_DIR/skill-usage.jsonl" 2>/dev/null || true
 ```

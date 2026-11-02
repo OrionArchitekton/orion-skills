@@ -1,19 +1,42 @@
 ---
 name: orion-deep-research
-description: Use when running a deep, multi-source, fact-checked research report that must land DURABLY in your research vault (not just the transcript). Fork of the native /deep-research with honest abstention accounting, a bounded reflect/knowledge-gap loop, TIER1/TIER2 grading, a judge-gate that quarantines inconclusive runs, and terminal persistence to a research vault with a verification-provenance ledger. Triggers - "/orion-deep-research <question>", "deep research X and save it to the vault", "durable deep research on X", "research X and persist the findings". NOT for a throwaway answer (use native /deep-research) and NOT for building a goal prompt (that is goal-prompt).
+description: Use when a multi-source, fact-checked research report must persist in a research vault with explicit uncertainty and verification provenance. The bundled executable requires a compatible Claude Workflow executor; see prerequisites and the unresolved origin record before use or redistribution.
 ---
 
 # orion-deep-research
 
-A durable, quality-gated fork of the native `/deep-research`. The native command is
-**compiled into the Claude Code binary** (unforkable in place) and its Workflow sandbox
-**cannot write files**, so its report only ever lives in the transcript. This skill owns the
-editable copy: the research core is `deep-research.workflow.js` (a Workflow script), and this
-wrapper adds the value the sandbox cannot: **honest verification**, a **judge-gate**,
-and **durable, disclaimed persistence** to your research vault.
+This package contains a research workflow and instructions for judging and
+persisting its report. Its portable principles are honest abstention accounting,
+bounded follow-up research, explicit TIER 1/TIER 2 claims and evidence-backed
+persistence. Those principles can guide research in other harnesses; they do not
+make the bundled executable portable to those harnesses.
 
-See `SPEC.md` for the behavior contract and `lib/*.mjs` (+ `npm test`, 50 cases) for the
-tested pure logic the workflow inlines.
+See `SPEC.md` for the behavior contract and `lib/*.mjs` (`npm test`) for the pure
+logic checks. The original history describes a native fork; its implementation
+origin and redistribution basis remain unresolved. See [provenance and the exact
+open question](PROVENANCE.md). Preserve that blocker for whole-collection release;
+local tests cannot establish rights or native compatibility.
+
+## Execution prerequisites and limits
+
+- The bundled `deep-research.workflow.js` requires the **Claude Workflow tool**
+  with `scriptPath`/`args`, its workflow globals (`phase`, `agent`, `log`) and the
+  search/source-reading capabilities requested by its agents. A plain Node.js
+  process, a skill installer, or another harness's shell cannot supply that tool.
+  Confirm the executor's available interface before invocation; support for this
+  script and `resumeFromRunId` has not been qualified by the offline tests here.
+- The wrapper needs an independent judge-agent facility, file writes to a
+  user-selected `<RESEARCH_VAULT>`, and Python 3 for the bundled recovery script.
+  Replace `<SKILL_DIR>` with this skill's installed absolute directory. Use only
+  research/provider access and output writes already authorized for the task.
+- If the Workflow executor is absent or its compatibility is unknown, stop before
+  invocation and report the missing prerequisite. There is no bundled executable
+  fallback. Separately authorized manual research may use the principles above,
+  but must be labeled manual research, without claiming a completed Workflow run.
+- Node.js with its built-in test runner executes the local pure-logic, drift and
+  simulated orchestration tests. These tests do not fetch live sources, invoke
+  the native executor or qualify native support. `package.json` is a private test
+  helper at its own version, separate from the collection release version.
 
 ## When to use / not use
 - USE for research whose findings must survive `/compact` and be re-findable: a durable dated
@@ -26,7 +49,7 @@ tested pure logic the workflow inlines.
 ### 0. Scope-check (before invoking)
 If the question is underspecified (e.g. "what car to buy" with no budget/use-case/region), ask
 2-3 clarifying questions and fold the answers into a single refined question. Autonomous callers
-(`/goal`, chain-launcher) pass an already-refined question and skip this.
+(for example, a user-authorized goal runner) pass an already-refined question and skip this.
 
 ### 1. Run the workflow
 ```
@@ -40,7 +63,8 @@ nothing. On completion you receive:
    failures[] }, stats{ reflectFired, sourcesFetched, tier, budget, ... } }`
 
 ### 2. Recovery gate (before you trust or persist anything)
-Read `verification` FIRST. It is honest by construction: an abstained/rate-limited claim is
+Only use the resume form below if the executor explicitly supports it; otherwise
+retain the partial output and report recovery unavailable. Read `verification` FIRST. It is honest by construction: an abstained/rate-limited claim is
 `unverified`, never `refuted`.
 - If `verification.inconclusive === true` OR `verification.failures` is non-empty: the run hit
   infra trouble (rate-limit, dead search, fetch fails). Do NOT transcribe "inconclusive" into a
@@ -136,7 +160,8 @@ Two). No direct push to the default branch.
 - The workflow inlines the tested `lib/*.mjs` logic (the sandbox cannot import). After changing
   any `lib/*.mjs`, re-copy the function into `deep-research.workflow.js` and run `npm test`
   (verify + budget + tiers + the workflow-sim integration test must stay green).
-- Keep the research spine a faithful superset of native so native updates can be re-synced; every
-  divergence from native is commented in the workflow header. The bundled recovery tool
+- Preserve the documented research behavior. The workflow header records historical
+  native-lineage claims, not proof of native parity or permission to copy updates.
+  Resolve provenance before any upstream resynchronization. The bundled recovery tool
   (`scripts/abstention_report.py`) is the tested spec for the abstention semantics and the
   fallback for runs of the still-unforkable native command.

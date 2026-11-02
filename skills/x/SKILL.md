@@ -46,7 +46,8 @@ the environment however you manage secrets, e.g.:
 ```bash
 # .env file:
 export X_API_KEY=...        # then `source ~/.x.env` before running, or:
-env $(cat ~/.x.env | xargs) python3 ~/.claude/skills/x/publish-core/x_client.py post --text "…" --send
+source ~/.x.env
+python3 ~/.claude/skills/x/publish-core/x_client.py post --text "…" --send
 # Doppler:   doppler run -- python3 .../x_client.py post --text "…" --send
 # 1Password: op run -- python3 .../x_client.py post --text "…" --send
 # CI:        set them as repo/Action secrets and expose via env:
@@ -90,10 +91,14 @@ synthetic values, and a live send is impossible.
      ```bash
      python3 ~/.claude/skills/x/publish-core/x_client.py post --text "$TEXT" --send
      ```
-   On `--send` the client **atomically reserves the cap slot before the POST**
+   On `--send`, after the arm and credential gates, the client validates the
+   **exact outgoing text** with the redactor. ABSTAIN (including broken denylist
+   configuration) returns exit 3 with no reservation or network send. The client
+   then **atomically reserves the cap slot before the POST**
    (an `at_cap`-then-`incr` race would let two concurrent sessions both publish,
    so the reservation is a single flock-guarded check-and-increment). At cap it
-   refuses with exit 4 and sends nothing. The client also records its own receipt
+   refuses with exit 4 and sends nothing. Invalid or unreadable cap state returns
+   exit 5, preserving the ledger for recovery. The client also records its own receipt
    to `~/.claude/state/x-receipts.jsonl`. There is **no separate post-send
    increment step**, the reservation already counted the publish.
 
@@ -121,7 +126,15 @@ touch ~/.claude/state/publishers-armed
 - Manual or autonomous, the redactor + cap apply identically.
 - **Install your denylist before first use**: without `~/.claude/config/x-denylist.txt`
   the redactor still catches secret-shaped tokens and RFC-1918 IPs (built-in), but
-  NOT your hostnames/products/clients. `--check` warns when that file is absent.
+  NOT your hostnames/products/clients. `--check` warns when the default file is
+  absent. If `$X_DENYLIST_FILE` is set, that input must exist and be readable
+  UTF-8 text with one Python regex per line. A broken rule or unreadable input
+  blocks; diagnostics report failure classes and line numbers without private rules.
+- Invalid or unreadable cap state returns exit 5 before send and preserves the
+  original bytes. Never reset unknown usage to zero. Recovery guidance lives in
+  `docs/runbooks/publishing-safety-recovery.md` in the source repository.
+- An uncertain send keeps its reserved slot. Verify the original attempt;
+  never blindly retry or refund that reservation.
 - For the autonomous trigger (a hook that nudges the agent when a signal
   surfaces), see `references/HOOK-PATTERN.md`, it's an adapt-it pattern (signal
   detection is yours to define); hooks NUDGE, they never post.

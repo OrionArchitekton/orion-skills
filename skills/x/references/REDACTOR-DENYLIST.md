@@ -69,3 +69,19 @@ machine-screening real **source code** (embedded secrets, structural identifiers
 business logic). For code/config surfaces: keep them human-gated, pair the
 denylist with an entropy/allowlist secret scanner (gitleaks/trufflehog-class),
 and prefer publishing material that is already public.
+
+Configuration failures also return ABSTAIN. An absent default denylist keeps the
+built-in-only optional behavior. Setting `$X_DENYLIST_FILE` makes that input
+required: it must exist, be readable UTF-8 text, and contain one valid Python
+regex per non-comment line. A directory is not a denylist. A malformed rule
+blocks the whole guard, including redacted previews; diagnostics identify the
+failure class and line number without printing private rules. Gist's
+`--ack-public-hits` never overrides a configuration failure.
+
+The format is regex-line text, not a JSON rule schema. A valid regex such as
+`[123]`, `[true]` or `{"x":1}` keeps its regex meaning even when a JSON parser
+could also parse that line. Comments start with `#` after optional whitespace;
+blank lines are ignored. No JSON-content heuristic or automatic format selection
+is applied. UTF-8 text is read as written; a BOM is not specially normalized.
+Compilation resource/recursion failures refuse safely, and special files such as
+FIFOs are refused before reading. Diagnostics never include the private rule.

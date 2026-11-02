@@ -102,11 +102,33 @@ def is_gist_armed() -> bool:
     return ARM_FLAG_PATH.exists() and GIST_ARM_FLAG_PATH.exists()
 
 
+class StateError(ValueError):
+    """Unsafe persisted state; diagnostics never include its contents."""
+
+
+def _unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise StateError("state: duplicate-json-key")
+        result[key] = value
+    return result
+
+
 def read_json(path: Path, default):
+    """Only genuinely absent first-use state may use the default."""
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        contents = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        if path.is_symlink():
+            raise StateError("state: unreadable-json") from None
         return default
+    except (OSError, UnicodeError):
+        raise StateError("state: unreadable-json") from None
+    try:
+        return json.loads(contents, object_pairs_hook=_unique_object)
+    except (ValueError, RecursionError):
+        raise StateError("state: invalid-json") from None
 
 
 def write_json(path: Path, obj) -> None:

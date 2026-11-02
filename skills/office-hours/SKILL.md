@@ -238,16 +238,20 @@ After counting signals, append a session entry to the builder profile. This is t
 source of truth for all closing state (tier, resource dedup, journey tracking).
 
 ```bash
-STATE_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours"
-# Protect the private state dir BEFORE the first write: git's local exclude file
-# ignores it immediately without mutating the tracked .gitignore. No-op outside git.
-GIT_DIR=$(git rev-parse --git-dir 2>/dev/null) && mkdir -p "$GIT_DIR/info" \
-  && grep -qxF '.office-hours/' "$GIT_DIR/info/exclude" 2>/dev/null \
-  || { [ -n "$GIT_DIR" ] && echo '.office-hours/' >> "$GIT_DIR/info/exclude"; }
-mkdir -p "$STATE_ROOT"
+STATE_ROOT="$(bash "<SKILL_DIR>/scripts/private-state.sh")" || exit 1
 ```
 
-This is project-local state (not a Claude-local home), so on first use in a project,
+Replace `<SKILL_DIR>` with this installed skill's absolute directory. Run the initializer
+before **every** profile or journey write, including the Phase 6 recipes. A failure
+means skip that private write and continue the consultation without persisted
+profile state; never fall back to an unprotected directory. The initializer needs
+Bash and Git; the JSON append also needs jq. It resolves Git's effective exclusion
+file for ordinary and linked worktrees, preserves unrelated rules and checks the
+profile is ignored before creating its directory. Outside Git, persistence is
+unavailable. This is a guard against accidental Git disclosure, not encryption or
+protection against another local process changing paths concurrently.
+
+This is project-local state, so on first use in a project,
 suggest to the user: add `.office-hours/` to the project's `.gitignore` (it holds
 personal session state, not a deliverable).
 
@@ -263,12 +267,7 @@ Append one JSON line with these fields (substitute actual values from this sessi
 - `topics`: array of 2-3 topic keywords that describe what this session was about
 
 ```bash
-STATE_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours"
-# Protect the private state dir BEFORE the first write: git's local exclude file
-# ignores it immediately without mutating the tracked .gitignore. No-op outside git.
-GIT_DIR=$(git rev-parse --git-dir 2>/dev/null) && mkdir -p "$GIT_DIR/info" \
-  && grep -qxF '.office-hours/' "$GIT_DIR/info/exclude" 2>/dev/null \
-  || { [ -n "$GIT_DIR" ] && echo '.office-hours/' >> "$GIT_DIR/info/exclude"; }
+STATE_ROOT="$(bash "<SKILL_DIR>/scripts/private-state.sh")" || exit 1
 jq -cn --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg mode "MODE" \
   --arg slug "${SLUG:-unknown}" --argjson n N --argjson signals SIGNALS_ARRAY \
   --arg doc "DOC_PATH" --arg assignment "ASSIGNMENT_TEXT" --argjson topics TOPICS_ARRAY \
@@ -490,7 +489,8 @@ After the loop completes (PASS, max iterations, or convergence guard):
 
 3. Append metrics:
 ```bash
-ANALYTICS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours/analytics"
+STATE_ROOT="$(bash "<SKILL_DIR>/scripts/private-state.sh")" || exit 1
+ANALYTICS_DIR="$STATE_ROOT/analytics"
 mkdir -p "$ANALYTICS_DIR"
 echo '{"skill":"office-hours","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","iterations":ITERATIONS,"issues_found":FOUND,"issues_fixed":FIXED,"remaining":REMAINING,"quality_score":SCORE}' >> "$ANALYTICS_DIR/spec-review.jsonl" 2>/dev/null || true
 ```
@@ -530,3 +530,8 @@ To keep this skill lean, depth was moved to `references/` (load only when needed
 
 - Shared runtime preamble → `references/preamble.md`
 - 4 detailed section(s) → `references/details.md`: Phase 2A: Startup Mode (YC Product Diagnostic), Phase 3.5: Cross-Model Second Opinion (optional), Visual Sketch (UI ideas only), Phase 6: Handoff (The Relationship Closing)
+
+## Attribution
+
+See [source and modification history](PROVENANCE.md) and the upstream license
+notice in this skill directory; retain them when copying the skill.

@@ -1,0 +1,151 @@
+{
+  "author-workflow-fanout": [
+    "SKILL.md",
+    "workflow_lint.py"
+  ],
+  "chain-launcher": [
+    "SKILL.md"
+  ],
+  "delegate": [
+    "SKILL.md",
+    "scripts/delegate.py"
+  ],
+  "design-consultation": [
+    "LICENSE.gstack",
+    "LICENSE.orion",
+    "PROVENANCE.md",
+    "SKILL.md",
+    "references/details.md",
+    "references/preamble.md"
+  ],
+  "design-fail-closed-gate": [
+    "SKILL.md"
+  ],
+  "document-release": [
+    "LICENSE.gstack",
+    "LICENSE.orion",
+    "PROVENANCE.md",
+    "SKILL.md",
+    "references/preamble.md"
+  ],
+  "gist": [
+    "SKILL.md",
+    "publish-core/cap_ledger.py",
+    "publish-core/common.py",
+    "publish-core/gist_client.py",
+    "publish-core/redactor.py",
+    "publish-core/selftest.py",
+    "publish-core/x-denylist.sample.txt",
+    "references/DERIVE-FROM-PUBLIC.md",
+    "references/REDACTOR-DENYLIST.md"
+  ],
+  "goal-prompt": [
+    "SKILL.md",
+    "references/prompt-scaffold.md",
+    "references/recon.md",
+    "references/terminal-condition.md"
+  ],
+  "grokbot": [
+    "SKILL.md",
+    "references/capabilities.md",
+    "references/troubleshooting.md",
+    "scripts/grokbot-read",
+    "scripts/grokbot-send"
+  ],
+  "incident-as-code": [
+    "SKILL.md"
+  ],
+  "investigate": [
+    "LICENSE.diagnosing-bugs",
+    "LICENSE.gstack",
+    "LICENSE.orion",
+    "PROVENANCE.md",
+    "SKILL.md",
+    "references/preamble.md",
+    "scripts/hitl-loop.template.sh"
+  ],
+  "learn-capture": [
+    "SKILL.md"
+  ],
+  "office-hours": [
+    "LICENSE.gstack",
+    "LICENSE.orion",
+    "PROVENANCE.md",
+    "SKILL.md",
+    "references/details.md",
+    "references/preamble.md",
+    "scripts/private-state.sh"
+  ],
+  "orion-deep-research": [
+    "PROVENANCE.md",
+    "SKILL.md",
+    "SPEC.md",
+    "deep-research.workflow.js",
+    "lib/budget.mjs",
+    "lib/budget.test.mjs",
+    "lib/drift.test.mjs",
+    "lib/tiers.mjs",
+    "lib/tiers.test.mjs",
+    "lib/verify.mjs",
+    "lib/verify.test.mjs",
+    "lib/workflow-sim.test.mjs",
+    "package.json",
+    "scripts/abstention_report.py",
+    "scripts/test_abstention_report.py"
+  ],
+  "oss-loop": [
+    "SKILL.md"
+  ],
+  "pre-compact": [
+    "SKILL.md"
+  ],
+  "pre-pr": [
+    "SKILL.md"
+  ],
+  "prove-control-binds": [
+    "SKILL.md"
+  ],
+  "prove-deploy-is-live": [
+    "SKILL.md"
+  ],
+  "readonly": [
+    "SKILL.md",
+    "hooks/pretooluse-readonly.sh",
+    "scripts/readonly-mode.sh",
+    "selftest.py"
+  ],
+  "reprobe-stale-premise": [
+    "SKILL.md"
+  ],
+  "scope-guard": [
+    "SKILL.md"
+  ],
+  "ship": [
+    "SKILL.md"
+  ],
+  "tdd-loop": [
+    "SKILL.md",
+    "references/ENFORCER.md"
+  ],
+  "tools-router": [
+    "SKILL.md",
+    "reference-recon.py",
+    "session-injector.sh"
+  ],
+  "triage-fanout-verdicts": [
+    "SKILL.md",
+    "scripts/triage_verdicts.py"
+  ],
+  "x": [
+    "SKILL.md",
+    "publish-core/cap_ledger.py",
+    "publish-core/common.py",
+    "publish-core/redactor.py",
+    "publish-core/selftest.py",
+    "publish-core/x-denylist.sample.txt",
+    "publish-core/x_client.py",
+    "references/DOCTRINE.md",
+    "references/HOOK-PATTERN.md",
+    "references/REDACTOR-DENYLIST.md"
+  ]
+}

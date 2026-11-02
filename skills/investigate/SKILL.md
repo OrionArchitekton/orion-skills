@@ -171,3 +171,8 @@ passes after, and escalate after three failed hypotheses rather than guessing a 
 To keep this skill lean, depth was moved to `references/` (load only when needed):
 
 - `references/preamble.md`: retired; was a runtime preamble tied to a toolchain no longer present, not required for this skill's core flow.
+
+## Attribution
+
+See [source and modification history](PROVENANCE.md) and the upstream license
+notices in this skill directory; retain them when copying the skill.

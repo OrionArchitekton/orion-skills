@@ -26,15 +26,21 @@ contract.
 A pack is just a Markdown file in a **persistent directory**: NOT `/tmp` (wiped on
 reboot). Pick a durable, agent-neutral location and keep it consistent, e.g.:
 
-- `packs/`: one file per pack, named `<UTC-timestamp>-<slug>.md`.
-- a `LATEST.md` pointer (a copy of, or a path to, the newest pack) so a fresh
-  instance has one well-known file to read on resume.
+- `tasks/<task-id>/packs/`: one immutable timestamped file per checkpoint.
+- Return the **explicit pack path** for the task being handed off. A directory or
+  branch alone is not task identity: multiple tasks can share both.
 
-That is the entire contract. You can manage it **by hand** (write the file, update
-the pointer) or wrap it in a small **optional engine** that timestamps the id,
-repoints `LATEST.md`, supersede-links replaced packs, and rebuilds an index, but no
-such engine is required for this skill to work. The format is the durable part; the
-tooling is a convenience.
+Choose a stable, distinct task ID (for example `project-fix-import`) and record the
+repository identity and worktree in the body. Reuse that ID only for the same
+work. A replacement names the previous pack for that task; preserve the old bytes.
+An optional index or task-local pointer is a convenience, never an authority.
+No engine, hook or private runtime is required.
+
+A legacy global `LATEST.md` may belong to another task. Use it only after verifying
+that its task and repository match the current request and there is exactly one
+eligible continuation. Missing identity, conflicting candidates, or an ambiguous
+request means no pickup: request the exact task/path if current authority cannot
+resolve it. Never infer ownership or acceptance from a timestamp or an idle chat.
 
 ## The Iron Rule: Verify, Don't Transcribe
 
@@ -53,22 +59,44 @@ Note: current branch(es), uncommitted changes, any in-flight background jobs/age
 
 **2. Verify claims.** For every "I did X": does the commit/branch/PR actually exist? Did tests actually run (real output)? Was a deploy independently verified? Downgrade `verified_state` for anything you can't confirm.
 
-**3. Compose the body** using the template below. Be specific, file:line, SHAs, exact next move.
+**3. Compose the body** using the template below. Record the task, repository,
+accepted baseline plus acceptance evidence (or `unknown`), last verified outcome
+plus proof, unfinished step, owner, literal next action, and remaining authority.
+Acceptance and verification are different facts. Never fill in missing acceptance
+from recency, tests or your narrative.
 
-**4. Write the pack.** Write the body to a timestamped file in your packs directory and update the pointer:
+**4. Write the pack.** Prepare a body file with literal `Task: <task-id>` and
+`Repository: <repository-identity>` lines. Set `TASK_ID`, `REPO_ID` and `PACK_BODY`
+to those values and the body's absolute path. Choose a persistent `HANDOFF_ROOT`
+outside temporary storage (the default below is one option). Confirm the body and
+selection match the current task before running this shell recipe:
+
 ```bash
-PACKS=~/.claude/handoffs/packs            # or wherever you keep packs (persistent, not /tmp)
-mkdir -p "$PACKS"
-TS=$(date -u +%Y-%m-%dT%H%M%SZ)
-cp /tmp/pack-body.md "$PACKS/$TS-<slug>.md"
-cp "$PACKS/$TS-<slug>.md" ~/.claude/handoffs/LATEST.md   # the well-known pickup file
+set -eu
+umask 077
+: "${TASK_ID:?set a stable task ID}" "${REPO_ID:?set repository identity}" "${PACK_BODY:?set body path}"
+case "$TASK_ID" in ''|.|..|*[!a-zA-Z0-9._-]*) echo 'Invalid task ID' >&2; exit 1 ;; esac
+grep -qxF -- "Task: $TASK_ID" "$PACK_BODY" || { echo 'Task/body mismatch' >&2; exit 1; }
+grep -qxF -- "Repository: $REPO_ID" "$PACK_BODY" || { echo 'Repository/body mismatch' >&2; exit 1; }
+HANDOFF_ROOT="${HANDOFF_ROOT:-$HOME/.local/state/agent-handoffs}"
+PACKS="$HANDOFF_ROOT/tasks/$TASK_ID/packs"
+mkdir -p -- "$PACKS"
+PACK=$(mktemp "$PACKS/$(date -u +%Y-%m-%dT%H%M%SZ)-XXXXXX.md")
+cat -- "$PACK_BODY" > "$PACK"
+printf 'Read %s and resume only the matching task after verification.\n' "$PACK"
 ```
-Record in the body the directory + git baseline (branch, HEAD sha) you were working
-in, so a fresh instance can recognize which pack matches its working dir. If you use
-an engine, it does this (and supersede-links) for you; otherwise do it inline.
 
-**5. Print the pickup line.** Tell the user to paste this to the fresh instance:
-> Read ~/.claude/handoffs/LATEST.md and resume from it.
+This recipe preserves prior checkpoints even when two writes share a timestamp.
+Use a directory you control and the current workspace's ownership rules; the
+recipe does not acquire a task lease or arbitrate concurrent owners.
+
+**5. Print the explicit pickup line.** Give the exact path returned above. On
+pickup, check the pack's task/repository against the current request, then compare
+its accepted baseline, proof and next action with current project authority.
+Re-probe only the referenced live state needed for continuation. A stale pack is
+historical evidence: preserve it, use the newer accepted baseline, and do not
+execute a gated action just because its old next-action line names one. An
+unknown remaining authority stays unknown until resolved.
 
 **6. Flag, do not perform, promotions.** If the session produced a durable decision/learning, list it under *Candidate promotions* for the human to later move into memory/canon. Never auto-write canon.
 
@@ -76,7 +104,17 @@ an engine, it does this (and supersede-links) for you; otherwise do it inline.
 
 ```markdown
 # HANDOFF: <title>
+Task: <task-id>
+Repository: <repository-identity>
 **Date:** <YYYY-MM-DD> · **Host:** <box> · **Identity:** <git identity>
+**Worktree / branch / HEAD:** <absolute directory / branch / SHA>
+**Owner:** <actual owner or unknown; verify lease before resuming>
+**Accepted baseline:** <artifact/plan + acceptance evidence, or unknown>
+**Last verified outcome:** <observable result + proof and verification time>
+**Unfinished step:** <one concrete step>
+**Next action:** <literal authorized first move>
+**Remaining authority:** <scope granted; additional decisions still needed, or unknown>
+**Supersedes:** <prior pack for this same task, or none>
 **Pointers:** memory file(s) · authoritative plan · proof packet · audit packs
 
 ## TL;DR: where things stand
@@ -119,8 +157,8 @@ The highest-value lines in a pack are locked decisions. A fresh instance has no 
 ## Pack management operations (if you build/use an engine)
 
 A pack manager, optional, is just convenience around the file format above. Useful
-operations: **create** (timestamp + write + repoint `LATEST.md` + index), **latest**
-(path + next-action of the newest pack), **list** (by status), **supersede** (link a
+operations: **create** (timestamp + write + record explicit task path + index), **latest**
+(path + next-action, filtered by task identity), **list** (by status), **supersede** (link a
 replacement), **set-status** (`active | done | superseded | stale | archived`),
 **sweep** (archive superseded packs older than N days, move, never delete). None are
 required; you can do all of this by hand.
@@ -132,11 +170,23 @@ required; you can do all of this by hand.
 - **Vague next steps** ("continue the work") → give the literal first command/file.
 - **Omitting locked decisions** → re-litigation. Include "do NOT re-ask".
 - **Auto-promoting to canon** → packs are evidence; flag promotions, let a human move them.
-- **Leaving many "active" packs for one arc** → a per-dir "newest active pack" selector then surfaces an *older* pack instead of the head. When a session continues an arc that already has a pack, mark the prior one `superseded` (or delete its pointer) so only the head is current.
+- **Leaving many "active" packs for one arc** → a per-dir "newest active pack" selector then surfaces an *older* pack instead of the head. When a session continues an arc that already has a pack, record that the prior pack is superseded by this task's replacement, preserving the old pack. Never supersede another task's pack.
 
 ## Other agent runtimes
 
 The format is plain Markdown and tool-agnostic, it works anywhere you can write a
 file. If your runtime auto-surfaces a pack on resume (via a session-start hook), great;
-if not, the convention still works, just **read your `LATEST.md` (or newest pack) manually**
-when you start a fresh session, since nothing will auto-inject the pointer.
+if not, the convention still works, read the explicit task pack manually when starting a fresh session. Any runtime
+adapter must separately demonstrate matching task selection; these instructions
+do not install or qualify one.
+
+## Worked reader checks
+
+If task A and task B share a checkout and B writes the newest global pointer,
+A's reader opens A's explicit pack. If given B's pack instead, it identifies the
+mismatch and does not execute B's next action. A legacy latest pickup is permitted
+only after an affirmative unique match of task and repository.
+
+If A's old pack names accepted draft v1 and a release next action, but the current
+request accepts v2 and limits work to local review, resume v2's review. Preserve
+v1's evidence and the release gate. A recorded next action never grants authority.

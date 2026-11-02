@@ -64,16 +64,18 @@ fetch is what proves the content is already world-readable.
    - `REFUSED: ... HTTP 404` → the path/ref is wrong or the repo is not public.
      Fix the path; never bypass (the fetch is the already-public proof).
    - `VERDICT: ABSTAIN` → the backstop hit something. Because the fetch already
-     proved world-readability, a hit is a **false positive** (e.g. a public doc
+     proved world-readability, a hit may be a **false positive** (e.g. a public doc
      that shows a token PREFIX in an example).
 
 3. **Review hits, then ack if benign.** Eyeball each printed hit. If, and only
    if, each is a benign already-public token, re-run with `--ack-public-hits`.
-   **Never ack a hit you have not read.** A hit that looks like a real secret
-   means a leak is already live in the public repo and must be fixed there first.
+   **Never ack a hit you have not read.** Configuration failures are not content
+   hits: `redactor-config` blocks with exit 3 even with `--ack-public-hits`.
+   Repair the configured denylist before proceeding. A hit that looks like a real
+   secret means a leak is already live in the public repo and must be fixed there first.
 
 4. **Cap check (optional preview).** The live `--send` path enforces the cap
-   itself (refuses with exit 4 at cap, increments on success), so this is just a
+   itself (refuses with exit 4 at cap, reserves before create), so this is just a
    way to see remaining room before you send:
    ```bash
    python3 ~/.claude/skills/gist/publish-core/cap_ledger.py check gist   # exit 4 = at cap
@@ -90,14 +92,16 @@ fetch is what proves the content is already world-readable.
      touch ~/.claude/state/gist-publishers-armed
      python3 ~/.claude/skills/gist/publish-core/gist_client.py create \
        --repo OWNER/REPO --path path/to/file.md --desc "..." \
-       --expect-sha256 file.md=<sha256-from-dry-run> --ack-public-hits --send
+       --expect-sha256 "file.md=$REVIEWED_SHA256" --send
      ```
      The live path refuses if either flag is absent, the daily cap is reached, or
      the bytes drifted from `--expect-sha256`. On success it prints the gist URL,
      increments the cap (reserved BEFORE the create so a crash can't leave an
      uncounted public gist), and writes a receipt to
      `~/.claude/state/gist-receipts.jsonl`. For maximum safety, pin `--ref` to an
-     immutable commit SHA instead of a branch.
+     immutable commit SHA instead of a branch. Set `REVIEWED_SHA256` to the hash
+     from the reviewed dry-run. Add `--ack-public-hits` only after reviewing benign
+     content hits; configuration errors cannot be acknowledged.
 
 ## First run (smoke test before trusting it)
 
@@ -110,12 +114,13 @@ python3 ~/.claude/skills/gist/publish-core/selftest.py
 # 3. dry-run against a public path (no gh needed, nothing created):
 python3 ~/.claude/skills/gist/publish-core/gist_client.py create \
   --repo OWNER/REPO --path README.md --desc "test"
-# 4. arm (BOTH flags) + first live gist, then verify it on gist.github.com:
+# 4. set REVIEWED_SHA256 from the reviewed dry-run, then arm (BOTH flags) + first live gist, then verify it on gist.github.com:
 gh auth refresh -s gist          # if your token lacks the gist scope
 touch ~/.claude/state/publishers-armed
 touch ~/.claude/state/gist-publishers-armed
 python3 ~/.claude/skills/gist/publish-core/gist_client.py create \
-  --repo OWNER/REPO --path README.md --desc "test" --send
+  --repo OWNER/REPO --path README.md --desc "test" \
+  --expect-sha256 "README.md=$REVIEWED_SHA256" --send
 ```
 
 ## Hard rails
@@ -130,3 +135,11 @@ python3 ~/.claude/skills/gist/publish-core/gist_client.py create \
   gist-specific flag, so arming a prose publisher (e.g. /x) never silently arms
   the gist code surface, see `references/DERIVE-FROM-PUBLIC.md`.
 - Never print a token/secret value (the client and `gh` both avoid this; keep it).
+- An absent default custom denylist is optional. If `$X_DENYLIST_FILE` is set,
+  that input must exist and be readable UTF-8 text with one Python regex per
+  line. A broken rule or unreadable input blocks; private rules are never printed.
+- Invalid or unreadable cap state returns exit 5 before create and preserves the
+  original bytes. Never reset unknown usage to zero. Recovery guidance lives in
+  `docs/runbooks/publishing-safety-recovery.md` in the source repository.
+- An uncertain create keeps its reserved slot. Verify the original attempt;
+  never blindly retry or refund that reservation.
