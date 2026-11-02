@@ -512,8 +512,7 @@ This must feel earned, not broadcast. If the evidence doesn't support it, skip e
 with a narrative arc (not a data table). The arc tells the STORY of their journey in
 second person, referencing specific things they said across sessions. Then open it:
 ```bash
-STATE_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours"
-mkdir -p "$STATE_ROOT"
+STATE_ROOT="$(bash "<SKILL_DIR>/scripts/private-state.sh")" || exit 1
 open "$STATE_ROOT/builder-journey.md"
 ```
 
@@ -616,8 +615,7 @@ PAUL GRAHAM ESSAYS:
 1. Log the selected resource URLs to the builder profile (single source of truth).
 Append a resource-tracking entry:
 ```bash
-STATE_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.office-hours"
-mkdir -p "$STATE_ROOT"
+STATE_ROOT="$(bash "<SKILL_DIR>/scripts/private-state.sh")" || exit 1
 echo '{"date":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'","mode":"resources","project_slug":"'"${SLUG:-unknown}"'","signal_count":0,"signals":[],"design_doc":"","assignment":"","resources_shown":["URL1","URL2","URL3"],"topics":[]}' >> "$STATE_ROOT/builder-profile.jsonl"
 ```
 
