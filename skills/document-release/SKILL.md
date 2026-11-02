@@ -1,11 +1,10 @@
 ---
 name: document-release
 description: |
-  Post-ship documentation update. Reads all project docs, cross-references the
-  diff, updates README/ARCHITECTURE/CONTRIBUTING/CLAUDE.md to match what shipped,
-  polishes CHANGELOG voice, cleans up TODOS, and optionally bumps VERSION. Use when
-  asked to "update the docs", "sync documentation", or "post-ship docs".
-  Proactively suggest after a PR is merged or code is shipped.
+  Use on a feature branch before a pull request merges, after code changes are
+  committed, to check release documentation against the diff. Triggers include
+  "update the docs", "sync documentation", and "prepare release docs". For an
+  already merged change, first prepare a separate documentation branch.
 ---
 ## Step 0: Detect platform and base branch
 
@@ -46,10 +45,16 @@ branch name wherever the instructions say "the base branch" or `<default>`.
 
 ---
 
-# Document Release: Post-Ship Documentation Update
+# Document Release: Pre-Merge Documentation Review
 
-You are running the `/document-release` workflow. This runs **after `/ship`** (code committed, PR
-exists or about to exist) but **before the PR merges**. Your job: ensure every documentation file
+You are running the `/document-release` workflow on a feature branch with code
+changes committed, while preparing or updating a PR **before it merges**. The
+bundled `/ship` is an optional finish checklist; this skill has no dependency on
+one of its numbered steps. For an already merged release, prepare a separate docs
+branch against the current base and review the relevant release diff explicitly.
+Follow the repository's `AGENTS.md` or `CLAUDE.md` and the current request for
+commit, push and PR-metadata authority; prepare local edits when outward actions
+are outside that authority. Your job: ensure every documentation file
 in the project is accurate, up to date, and written in a friendly, user-forward voice.
 
 You are mostly automated. Make obvious factual updates directly. Stop and ask only for risky or
@@ -193,7 +198,7 @@ preserved them. This skill must NEVER do that.
 **Rules:**
 1. Read the entire CHANGELOG.md first. Understand what is already there.
 2. Only modify wording within existing entries. Never delete, reorder, or replace entries.
-3. Never regenerate a CHANGELOG entry from scratch. The entry was written by `/ship` from the
+3. Never regenerate a CHANGELOG entry from scratch. An existing entry records the
    actual diff and commit history. It is the source of truth. You are polishing prose, not
    rewriting history.
 4. If an entry looks wrong or incomplete, use AskUserQuestion. Do NOT silently fix it.
@@ -230,8 +235,10 @@ After auditing each file individually, do a cross-doc consistency pass:
 
 ## Step 7: TODOS.md Cleanup
 
-This is a second pass that complements `/ship`'s Step 5.5. Read `review/TODOS-format.md` (if
-available) for the canonical TODO item format.
+Review TODOs against this branch's diff. If the consumer repository supplies
+`review/TODOS-format.md`, follow that local convention; otherwise preserve the
+format already used in its TODOS.md. No external review skill or ship step is
+required.
 
 If TODOS.md does not exist, skip this step.
 

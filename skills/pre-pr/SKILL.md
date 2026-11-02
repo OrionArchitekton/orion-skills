@@ -1,6 +1,6 @@
 ---
 name: pre-pr
-description: Repo-contract-aware preflight plus advisory diff review before creating any PR. Detects base branch, runs repo-local checks, scans for secrets, and reports findings with severity levels.
+description: Use before creating a pull request or pushing a new PR branch, when repository checks and changed-behavior coverage need verification.
 ---
 
 # Pre-PR Verification
@@ -11,7 +11,7 @@ Structured verification pass before creating any PR. Run this BEFORE `gh pr crea
 
 First check for repo-local PR convention. Look for a declared base branch in:
 
-1. Repo-local `CLAUDE.md` or `AGENTS.md` (some repos use a non-`main` default branch, e.g. `develop`, `release`, or a project-specific trunk; never assume `main`)
+1. Repo-local `AGENTS.md` or `CLAUDE.md` (some repos use a non-`main` default branch, e.g. `develop`, `release`, or a project-specific trunk; never assume `main`)
 2. `.claude/pr-config.json` if it exists (field: `baseBranch`)
 
 If no repo-local convention is found, fall back:
@@ -32,10 +32,11 @@ Check that the current branch is NOT the base branch or any protected branch dec
 
 ## Step 3: Run repo-local preflight
 
-Check for and execute repo-local preflight in this order:
-
-1. `.claude/hooks/pre-commit.sh`: if present and executable, run it
-2. Repo-declared CI contract commands from `CLAUDE.md` or `AGENTS.md` (e.g., `pytest`, `npm test`, `bun test`)
+Read the repository's `AGENTS.md` or `CLAUDE.md` and CI configuration. Run
+its declared applicable checks (for example, `pytest`, `npm test`, `bun test`).
+If the repository declares an existing trusted preflight executable, run it too;
+`.claude/hooks/pre-commit.sh` is one optional convention, not a bundled requirement.
+Do not install or activate hooks as part of this check.
 
 If no repo-local preflight exists, report as INFO: "No repo-local preflight found."
 
@@ -81,6 +82,32 @@ git diff --stat <base-branch>...HEAD
 
 For each file, state what changed and why (based on the diff content and commit messages).
 
+## Step 7: Coverage of the diff
+
+Review changed behavior as well as the suite's exit code:
+
+1. Identify each changed behavior, invariant, error path, authority gate, state
+   transition or side effect in `git diff <base-branch>...HEAD`.
+2. Name the highest useful test seam already available (unit, API/integration,
+   CLI/hook, migration, or manual proof when automation is inappropriate).
+3. Map each behavior to a test or observed proof that would fail if it broke.
+   Report **WARNING** for a missing match, especially for silent failure,
+   fallback, authorization, data integrity and state changes. Existing green tests
+   alone do not establish coverage of the changed behavior.
+4. Mechanical edits and prose-only documentation corrections need no new tests;
+   report why this review is not applicable. A documented executable recipe or a
+   change to a supported workflow is behavior and still needs a scenario/proof.
+   Respect the current request's authority for any live proof; an absent grant
+   means report the gap, not invoke production or a provider.
+
+Worked example: a PR changes an API's 401 fallback, while its only test exercises
+200 success. Report `WARNING: 401 fallback has no matching failure-path test at
+the API seam`, even if the full suite passes. A Markdown spelling correction has
+no changed behavior: report `INFO: coverage review not applicable; prose-only`.
+
+This review is advisory. It does not weaken repository-required checks, convert
+warnings into approval, or grant push/PR/merge authority.
+
 ## Output Format
 
 ```
@@ -94,7 +121,7 @@ For each file, state what changed and why (based on the diff content and commit 
 - [secrets found, protected-branch violation, preflight failure]
 
 ### WARNING
-- [advisory findings: TODOs, debug markers, large diffs, repo-local patterns]
+- [advisory findings: TODOs, debug markers, large diffs, repo-local patterns, changed behavior without matching proof]
 
 ### INFO
 - [file inventory, branch state, preflight status]
