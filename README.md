@@ -1,5 +1,7 @@
 # orion-skills
 
+Part of [Cosmocrat OS](https://www.cosmocrat.ai/), a family of independent tools for human-directed AI work. [Choose a starting workflow](https://www.cosmocrat.ai/docs). This project keeps its own installation identifiers, releases, license and support boundaries.
+
 A small, curated library of original Agent Skills for disciplined coding-agent
 workflows. The full library targets
 [Claude Code](https://docs.claude.com/en/docs/claude-code); a narrowly validated
