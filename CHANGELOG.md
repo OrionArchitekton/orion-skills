@@ -4,11 +4,11 @@ All notable changes to the orion-skills library. This project follows Semantic
 Versioning (https://semver.org): adding a skill is a MINOR bump, a non-breaking change to
 an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
 
-## [Unreleased]
+## [0.7.1] - 2026-11-02
 
-Proposed next collection/plugin version: **0.7.1**, a compatible optional loading
-path; not released or reserved. Existing direct installs and the three Codex
-qualification pins are unchanged.
+Published at `13ee89202f6a730e8b79326343bb885d0a82eda5` with a compatible optional
+plugin loading path. Existing direct installs and the three Codex qualification
+pins are unchanged.
 
 ### Added
 
@@ -25,10 +25,7 @@ qualification pins are unchanged.
 ## [0.7.0] - 2026-11-02
 
 Published at `530df6169d01ac65059e6de7cc6f04dad8f4865d`.
-The entries below retain the release-preparation record; publication is complete.
-
-
-The source catalog contains 29 skills under the new-skill MINOR policy.
+The released catalog contains 29 skills under the new-skill MINOR policy.
 
 ### Added
 
@@ -64,11 +61,11 @@ The source catalog contains 29 skills under the new-skill MINOR policy.
   maps changed behavior to tests or worked scenarios.
 - Adapted skills retain upstream and Orion notices in standalone copies. Research
   docs name executor prerequisites and record Dan Mercede's independent-authorship
-  attestation with its evidence limits. Collection publication remains held for
-  final qualification and explicit release approval; native support is unqualified.
+  attestation with its evidence limits. Final qualification and explicit release
+  approval were completed for this release; native research support is unqualified.
 - Delegate documentation corrects the absolute-path trust claim. A stricter
   installation policy is deferred for an explicit platform/layout and version
-  decision; this candidate preserves existing executable-selection behavior.
+  decision; this release preserves existing executable-selection behavior.
 - CI runs pinned Python checks, bundled Node tests, X/Gist selftests, and narrow
   source/README/mandatory-file distribution contracts.
 

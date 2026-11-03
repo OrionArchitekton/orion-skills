@@ -15,27 +15,25 @@ references:
 # Optional Claude Code plugin
 
 The plugin is session-local installation convenience for this repository's existing
-29 skill definitions. Tested CLI: **Claude Code 2.1.316, Linux/POSIX**. Proposed
-collection/plugin version: **0.7.1**, pending a separately approved release. The
-published v0.7.0 has no plugin manifest and remains unchanged. A plugin namespace
+29 skill definitions. Tested CLI: **Claude Code 2.1.316, Linux/POSIX**. Published
+collection/plugin version: [**0.7.1**](https://github.com/OrionArchitekton/orion-skills/releases/tag/v0.7.1).
+The published v0.7.0 has no plugin manifest and remains unchanged. A plugin namespace
 is not a grant to publish, delegate, install hooks or change settings.
 
 ## Load a reviewed clone or archive
 
-Clone the repository or extract a source archive containing the manifest. Until a
-new release is approved, select an explicitly reviewed source commit containing
-this change. Keep the whole repository together: skill-only copies are direct
+Clone the repository and select v0.7.1, or extract that release's source archive
+containing the manifest. Keep the whole repository together: skill-only copies are direct
 installs, not the plugin. Do not nest the skills under `.claude-plugin/`.
 
 ```bash
 git clone https://github.com/OrionArchitekton/orion-skills.git "orion skills"
 cd "orion skills"
-git checkout <reviewed-commit-containing-the-plugin>
+git checkout --detach 13ee89202f6a730e8b79326343bb885d0a82eda5 # v0.7.1
 claude plugin validate . --strict
 ```
 
-The placeholder must be replaced deliberately with a reviewed commit; this source
-PR does not prescribe installing its unmerged branch. For a tar/zip source archive,
+The checkout selects the published release commit. For a tar/zip source archive,
 extract it first and point at the resulting directory holding `.claude-plugin/`
 and `skills/`. Loading an extracted directory is the qualified archive route;
 direct zip loading is not qualified here.

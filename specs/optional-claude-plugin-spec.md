@@ -45,5 +45,5 @@ delegation or operator harness installation are allowed for qualification.
 Qualification targets Claude Code 2.1.316 on Linux/POSIX. Component discovery does
 not establish successful execution of every skill. Codex support remains the
 existing three-skill starter; Cowork, browser and native Workflow support are not
-established. Proposed next collection/plugin version is 0.7.1, subject to later
-release approval; no version is reserved by this source change.
+established. The optional loading path was published in collection/plugin version
+0.7.1 at `13ee89202f6a730e8b79326343bb885d0a82eda5` after release approval.
