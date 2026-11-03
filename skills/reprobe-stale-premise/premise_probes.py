@@ -59,11 +59,23 @@ def observe(root, relative, content=True, limit=MAX_FILE):
     with ExitStack() as stack:
         directories = []
 
-        def directory(name, parent=None):
+        def directory(name, parent=None, watch_changes=False):
             fd = os.open(name, flags | os.O_DIRECTORY, dir_fd=parent)
             stack.callback(os.close, fd)
-            directories.append((fd, signature(os.fstat(fd))))
+            directories.append((fd, signature(os.fstat(fd)), parent, name, watch_changes))
             return fd
+
+        def directories_stable():
+            for fd, before, parent_fd, name, watch in directories:
+                current = signature(os.fstat(fd))
+                # Unrelated siblings in root ancestors do not invalidate a read.
+                if (current if watch else current[:3]) != (before if watch else before[:3]):
+                    return False
+                if parent_fd is not None:
+                    named = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                    if signature(named)[:3] != current[:3]:
+                        return False
+            return True
 
         try:
             parent = directory('/')
@@ -72,10 +84,11 @@ def observe(root, relative, content=True, limit=MAX_FILE):
         except OSError:
             raise Unavailable('unavailable_root') from None
         root_info = os.fstat(parent)
+        directories[-1] = (*directories[-1][:4], True)
         opened = False
         try:
             for part in parts[:-1]:
-                parent = directory(part, parent)
+                parent = directory(part, parent, watch_changes=True)
             preliminary = os.stat(parts[-1], dir_fd=parent, follow_symlinks=False)
             if not stat.S_ISREG(preliminary.st_mode):
                 raise Unavailable('nonregular_source')
@@ -105,7 +118,7 @@ def observe(root, relative, content=True, limit=MAX_FILE):
             after = os.fstat(fd)
             named = os.stat(parts[-1], dir_fd=parent, follow_symlinks=False)
             if (signature(before) != signature(after) or signature(after) != signature(named)
-                    or any(signature(os.fstat(d)) != sig for d, sig in directories)):
+                    or not directories_stable()):
                 raise Unavailable('changed_during_read')
             source = {'path_sha256': digest(relative.encode()),
                       'root_device': root_info.st_dev, 'root_inode': root_info.st_ino,
@@ -116,7 +129,7 @@ def observe(root, relative, content=True, limit=MAX_FILE):
                 source['sha256'] = digest(data)
             return data, source
         except FileNotFoundError:
-            changed = opened or any(signature(os.fstat(d)) != sig for d, sig in directories)
+            changed = opened or not directories_stable()
             raise Unavailable('changed_during_read' if changed else 'missing_source') from None
         except OSError:
             raise Unavailable('unavailable_source') from None

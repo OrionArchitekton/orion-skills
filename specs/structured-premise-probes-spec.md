@@ -69,7 +69,9 @@ codes and bounded identifiers, metadata and hashes. Unsupported POSIX descriptor
 features return unknown rather than falling back to unsafe reads.
 
 Descriptors use no-follow and nonblocking flags. Hold directory descriptors;
-compare directory and file metadata before/after reads and re-stat the final name.
+compare source-directory and file metadata before/after reads and re-stat the
+final name. Check every ancestor name/device/inode/type binding, ignoring
+unrelated sibling activity above the selected root. Root replacement stays unknown.
 Detected replacement, disappearance, resize or metadata change returns unknown,
 without publishing a partial digest. Observation is a bounded local snapshot,
 not an atomic multi-file transaction or a promise of future stability. Hostile

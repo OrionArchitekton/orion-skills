@@ -301,6 +301,41 @@ class PremiseProbesTest(unittest.TestCase):
             self.assertEqual(proc.returncode, 1, proc.stdout)
             self.assertEqual(json.loads(proc.stdout)['results'][0]['status'], 'unknown')
 
+    def test_unrelated_ancestor_activity_is_not_source_drift(self):
+        from unittest.mock import patch
+        module = self.load_module()
+        (self.root / 'config.txt').write_text('enabled')
+        read = os.read
+        def concurrent_neighbor(fd, size):
+            data = read(fd, size)
+            (self.base / 'unrelated-sibling').write_text('unrelated activity')
+            return data
+        with patch.object(module.os, 'read', side_effect=concurrent_neighbor):
+            result = module.report({'schema_version': 1, 'premises': [self.premise()]},
+                                   str(self.root))['results'][0]
+        self.assertEqual(result['status'], 'confirmed')
+
+    def test_replaced_root_path_is_unknown(self):
+        from unittest.mock import patch
+        module = self.load_module()
+        (self.root / 'config.txt').write_text('enabled')
+        read = os.read
+        changed = False
+        def replace_root(fd, size):
+            nonlocal changed
+            data = read(fd, size)
+            if not changed:
+                changed = True
+                self.root.rename(self.base / 'old-source')
+                self.root.mkdir()
+                (self.root / 'config.txt').write_text('enabled')
+            return data
+        with patch.object(module.os, 'read', side_effect=replace_root):
+            result = module.report({'schema_version': 1, 'premises': [self.premise()]},
+                                   str(self.root))['results'][0]
+        self.assertEqual(result['status'], 'unknown')
+        self.assertEqual(result['reason'], 'changed_during_read')
+
 
 if __name__ == '__main__':
     unittest.main()

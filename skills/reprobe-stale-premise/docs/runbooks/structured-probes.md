@@ -52,7 +52,9 @@ byte detects growth. JSON duplicate keys, nonfinite numbers and malformed inputs
 fail closed. Maximum stdout is 65536 bytes; there is no report-file write flag.
 
 The helper opens no-follow, nonblocking descriptors, holds directory descriptors,
-checks metadata before/after reading and re-stats the final name. Detected changes
+checks source metadata before/after reading and re-stats the final name. Ancestor
+name/device/inode/type bindings are rechecked; unrelated siblings above the root
+do not invalidate observations. Root replacement stays unknown. Detected changes
 produce unknown without a partial hash. No source bytes, configuration, Git or
 operator state are written. Filesystem access-time accounting may occur on reads.
 This is a local observation, not a sandbox, atomic multi-file snapshot, filesystem
