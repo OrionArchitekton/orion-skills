@@ -6,9 +6,29 @@ an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
 
 ## [Unreleased]
 
-Proposed collection version: **0.7.0** under the new-skill MINOR policy, subject
-to final qualification and explicit version/commit release approval.
-No release or tag has been created. The source catalog contains 29 skills.
+Proposed next collection/plugin version: **0.7.1**, a compatible optional loading
+path; not released or reserved. Existing direct installs and the three Codex
+qualification pins are unchanged.
+
+### Added
+
+- Optional Claude Code plugin manifest using the existing skill tree, qualified
+  with Claude Code 2.1.316 validation and offline component inventory. No hooks,
+  MCP servers, permissions, marketplace catalog or automatic updates are added.
+- Clone/archive loading and removal runbook with explicit compatibility limits.
+
+### Fixed
+
+- Document plugin-relative, quoted helper paths for readonly, X, Gist and Grokbot
+  while preserving their direct-install paths and helper implementations.
+
+## [0.7.0] - 2026-11-02
+
+Published at `530df6169d01ac65059e6de7cc6f04dad8f4865d`.
+The entries below retain the release-preparation record; publication is complete.
+
+
+The source catalog contains 29 skills under the new-skill MINOR policy.
 
 ### Added
 

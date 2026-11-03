@@ -26,6 +26,17 @@ fail-CLOSED: anything it cannot evaluate is denied.
   behavioral discipline (the PreToolUse payload carries no subagent identity, so
   the marker is session-global, enter read-only, do the read-only work, clear).
 
+## Optional plugin loading
+
+Invoke `/orion-skills:readonly` for the plugin copy. Before running the examples,
+choose the `# Plugin:` assignment below instead of the direct-install assignment.
+Claude Code substitutes the plugin-root token in loaded Markdown; in a manual
+terminal replace it with the actual absolute plugin path. It is not a guaranteed
+shell environment variable. Loading the plugin registers no hooks: the marker
+alone does not protect edits. The registration example below remains a separate
+manual-install example; for a plugin, deliberately register the actual absolute,
+shell-quoted hook path from the chosen plugin version and reverify after updates.
+
 ## Activation: the marker lifecycle
 
 The enforcement hook is INERT until the marker is set. Use a small helper to
@@ -37,7 +48,8 @@ not this repo, so a bare `skills/readonly/...` path would not resolve. Set `RO`
 once and the rest of this document works verbatim either way:
 
 ```bash
-RO=~/.claude/skills/readonly          # installed
+RO=~/.claude/skills/readonly          # direct/manual install
+# Plugin: RO="${CLAUDE_PLUGIN_ROOT}/skills/readonly"
 # RO=./skills/readonly                # or, working inside a clone of this repo
 
 "$RO"/scripts/readonly-mode.sh on  "audit: <what>"   # enter read-only
