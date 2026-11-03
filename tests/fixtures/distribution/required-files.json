@@ -130,7 +130,11 @@
     "examples/guarded_write.py"
   ],
   "reprobe-stale-premise": [
-    "SKILL.md"
+    "SKILL.md",
+    "premise_probes.py",
+    "LICENSE.orion",
+    "PROVENANCE.md",
+    "docs/runbooks/structured-probes.md"
   ],
   "scope-guard": [
     "SKILL.md"
