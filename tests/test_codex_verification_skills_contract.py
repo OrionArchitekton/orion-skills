@@ -138,7 +138,9 @@ class CodexVerificationSkillsContractTest(unittest.TestCase):
         marketplace_manifests = sorted(
             path.relative_to(ROOT) for path in ROOT.rglob("marketplace.json")
         )
-        self.assertEqual(plugin_manifests, [])
+        # The optional Claude package is independent of direct Codex installs.
+        # Reject every other plugin manifest, including any Codex plugin.
+        self.assertEqual(plugin_manifests, [Path(".claude-plugin/plugin.json")])
         self.assertEqual(marketplace_manifests, [])
 
     def test_readme_binds_exact_codex_install_and_support_claims(self):

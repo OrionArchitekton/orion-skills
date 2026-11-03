@@ -29,7 +29,21 @@ until the redactor passes, the cap has room, and the system is armed.
   agent when a signal surfaces) is an optional pattern you wire up, see
   `references/HOOK-PATTERN.md`; the skill supports both manual and autonomous invocation.
 
-## Components (installed at `~/.claude/skills/x/`)
+## Locate bundled helpers
+
+Use the direct-install assignment below for manual installs. When this skill is
+loaded as a plugin, use the `# Plugin:` assignment instead before every command
+block. Claude Code substitutes the plugin-root token in the loaded Markdown;
+it is not a variable you can assume exists in a terminal. For a manual archive
+session, replace it with the actual absolute plugin directory. Keep paths quoted.
+Plugin invocation is `/orion-skills:x`; direct invocation stays `/x`.
+
+```bash
+CORE=~/.claude/skills/x/publish-core
+# Plugin: CORE="${CLAUDE_PLUGIN_ROOT}/skills/x/publish-core"
+```
+
+## Components
 
 - Redactor:  `publish-core/redactor.py`, fail-closed; built-in universal patterns + **your** denylist loaded from `~/.claude/config/x-denylist.txt` (copy `publish-core/x-denylist.sample.txt` there; see `references/REDACTOR-DENYLIST.md`)
 - Cap ledger: `publish-core/cap_ledger.py`, surface `x` (cap from `X_DAILY_CAP`)
@@ -47,7 +61,7 @@ the environment however you manage secrets, e.g.:
 # .env file:
 export X_API_KEY=...        # then `source ~/.x.env` before running, or:
 source ~/.x.env
-python3 ~/.claude/skills/x/publish-core/x_client.py post --text "…" --send
+python3 "$CORE/x_client.py" post --text "…" --send
 # Doppler:   doppler run -- python3 .../x_client.py post --text "…" --send
 # 1Password: op run -- python3 .../x_client.py post --text "…" --send
 # CI:        set them as repo/Action secrets and expose via env:
@@ -63,7 +77,7 @@ synthetic values, and a live send is impossible.
 
 2. **Redact / abstain (fail-closed):**
    ```bash
-   printf '%s' "$TEXT" | python3 ~/.claude/skills/x/publish-core/redactor.py --check -
+   printf '%s' "$TEXT" | python3 "$CORE/redactor.py" --check -
    ```
    Exit 0 = clean → continue. Exit 3 = ABSTAIN → do **not** post; show the hit
    classes, genericize, re-check.
@@ -75,7 +89,7 @@ synthetic values, and a live send is impossible.
 
 3. **Cap pre-check (informational):**
    ```bash
-   python3 ~/.claude/skills/x/publish-core/cap_ledger.py check x
+   python3 "$CORE/cap_ledger.py" check x
    ```
    Exit 0 = room. Exit 4 = AT CAP → stop ("do not continue: X cap reached today").
    This is a read-only heads-up only; the **authoritative** cap gate is the atomic
@@ -85,11 +99,11 @@ synthetic values, and a live send is impossible.
 4. **Arm check + post.**
    - **DISARMED (default)**: run a DRY-RUN and report it's disarmed:
      ```bash
-     python3 ~/.claude/skills/x/publish-core/x_client.py post --text "$TEXT"
+     python3 "$CORE/x_client.py" post --text "$TEXT"
      ```
    - **ARMED**: send live (creds come from env, never hard-coded):
      ```bash
-     python3 ~/.claude/skills/x/publish-core/x_client.py post --text "$TEXT" --send
+     python3 "$CORE/x_client.py" post --text "$TEXT" --send
      ```
    On `--send`, after the arm and credential gates, the client validates the
    **exact outgoing text** with the redactor. ABSTAIN (including broken denylist
@@ -107,12 +121,12 @@ synthetic values, and a live send is impossible.
 ```bash
 # 1. install YOUR denylist outside the skill (survives skill updates):
 mkdir -p ~/.claude/config
-cp ~/.claude/skills/x/publish-core/x-denylist.sample.txt ~/.claude/config/x-denylist.txt
+cp "$CORE/x-denylist.sample.txt" ~/.claude/config/x-denylist.txt
 $EDITOR ~/.claude/config/x-denylist.txt                  # add your hosts/products/clients
 # 2. prove the guards (stable; no fixture editing needed):
-python3 ~/.claude/skills/x/publish-core/selftest.py
+python3 "$CORE/selftest.py"
 # 3. dry-run: no creds needed, nothing sent:
-python3 ~/.claude/skills/x/publish-core/x_client.py post --text "hello"
+python3 "$CORE/x_client.py" post --text "hello"
 # 4. arm + first live post (then verify it appears on the account):
 touch ~/.claude/state/publishers-armed
 /x my first real post

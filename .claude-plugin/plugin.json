@@ -1,0 +1,11 @@
+{
+  "name": "orion-skills",
+  "version": "0.7.1",
+  "description": "Optional workflow and verification skills for human-directed coding agents.",
+  "author": {
+    "name": "Dan Mercede"
+  },
+  "homepage": "https://github.com/OrionArchitekton/orion-skills",
+  "repository": "https://github.com/OrionArchitekton/orion-skills",
+  "license": "MIT"
+}

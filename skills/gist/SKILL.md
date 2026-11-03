@@ -27,7 +27,21 @@ concrete implementation of the "Gate by artifact type" rule in
 **Human-gated** (`disable-model-invocation: true`): a human invokes `/gist`,
 reviews the dry-run, and sends. It never auto-fires and never auto-publishes.
 
-## Components (installed at `~/.claude/skills/gist/`)
+## Locate bundled helpers
+
+Use the direct-install assignment below for manual installs. When this skill is
+loaded as a plugin, use the `# Plugin:` assignment instead before every command
+block. Claude Code substitutes the plugin-root token in the loaded Markdown;
+it is not a variable you can assume exists in a terminal. For a manual archive
+session, replace it with the actual absolute plugin directory. Keep paths quoted.
+Plugin invocation is `/orion-skills:gist`; direct invocation stays `/gist`.
+
+```bash
+CORE=~/.claude/skills/gist/publish-core
+# Plugin: CORE="${CLAUDE_PLUGIN_ROOT}/skills/gist/publish-core"
+```
+
+## Components
 
 - Gist client: `publish-core/gist_client.py`, fetch public raw URL → backstop → dry-run by default
 - Redactor:    `publish-core/redactor.py`, backstop; built-in universal patterns + your denylist
@@ -58,7 +72,7 @@ fetch is what proves the content is already world-readable.
 
 2. **Dry-run (fetch + redactor backstop):**
    ```bash
-   python3 ~/.claude/skills/gist/publish-core/gist_client.py create \
+   python3 "$CORE/gist_client.py" create \
      --repo OWNER/REPO --path path/to/file.md --desc "..."
    ```
    - `REFUSED: ... HTTP 404` → the path/ref is wrong or the repo is not public.
@@ -78,7 +92,7 @@ fetch is what proves the content is already world-readable.
    itself (refuses with exit 4 at cap, reserves before create), so this is just a
    way to see remaining room before you send:
    ```bash
-   python3 ~/.claude/skills/gist/publish-core/cap_ledger.py check gist   # exit 4 = at cap
+   python3 "$CORE/cap_ledger.py" check gist   # exit 4 = at cap
    ```
 
 5. **Arm check + create.** A gist is a CODE surface, so it needs BOTH flags.
@@ -90,7 +104,7 @@ fetch is what proves the content is already world-readable.
      ```bash
      touch ~/.claude/state/publishers-armed
      touch ~/.claude/state/gist-publishers-armed
-     python3 ~/.claude/skills/gist/publish-core/gist_client.py create \
+     python3 "$CORE/gist_client.py" create \
        --repo OWNER/REPO --path path/to/file.md --desc "..." \
        --expect-sha256 "file.md=$REVIEWED_SHA256" --send
      ```
@@ -108,17 +122,17 @@ fetch is what proves the content is already world-readable.
 ```bash
 # 1. (optional) install your denylist for the backstop, outside the skill:
 mkdir -p ~/.claude/config
-cp ~/.claude/skills/gist/publish-core/x-denylist.sample.txt ~/.claude/config/x-denylist.txt
+cp "$CORE/x-denylist.sample.txt" ~/.claude/config/x-denylist.txt
 # 2. prove the guards:
-python3 ~/.claude/skills/gist/publish-core/selftest.py
+python3 "$CORE/selftest.py"
 # 3. dry-run against a public path (no gh needed, nothing created):
-python3 ~/.claude/skills/gist/publish-core/gist_client.py create \
+python3 "$CORE/gist_client.py" create \
   --repo OWNER/REPO --path README.md --desc "test"
 # 4. set REVIEWED_SHA256 from the reviewed dry-run, then arm (BOTH flags) + first live gist, then verify it on gist.github.com:
 gh auth refresh -s gist          # if your token lacks the gist scope
 touch ~/.claude/state/publishers-armed
 touch ~/.claude/state/gist-publishers-armed
-python3 ~/.claude/skills/gist/publish-core/gist_client.py create \
+python3 "$CORE/gist_client.py" create \
   --repo OWNER/REPO --path README.md --desc "test" \
   --expect-sha256 "README.md=$REVIEWED_SHA256" --send
 ```

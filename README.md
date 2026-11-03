@@ -41,6 +41,28 @@ auto-invoke it when the `description` matches the task. Skills that should only 
 operator-invoked (never model-auto-invoked) carry `disable-model-invocation: true` in
 their frontmatter.
 
+### Optional Claude Code plugin
+
+A clone or extracted source archive can also be loaded for one session, using
+Claude Code **2.1.316** (the qualified version):
+
+```bash
+claude --plugin-dir "/absolute/path/to/orion-skills"
+```
+
+This source change proposes plugin/collection version **0.7.1**; it has not been
+released. Published **v0.7.0** predates the plugin manifest. Use a reviewed source
+checkout containing `.claude-plugin/plugin.json`, not the v0.7.0 archive.
+Invoke bundled skills as `/orion-skills:pre-pr`, `/orion-skills:ship`, etc.
+The same `skills/` tree backs both loading paths. Direct installs above still use
+`/pre-pr` and `/ship`; choose one copy deliberately if you also installed it directly.
+
+Loading registers no hooks or MCP servers, grants no permissions, and does not arm
+publishing. Some skills require additional setup; discovery is not qualification
+of every workflow. See the [plugin loading and compatibility runbook](docs/runbooks/claude-plugin.md)
+for clone/archive loading, helper paths, explicit updates/removal, per-skill limits,
+and the existing Workflow prerequisite. No marketplace is provided; updates are manual. Codex qualification remains exactly the three skills below.
+
 ### skills CLI
 
 The [`skills` CLI](https://github.com/vercel-labs/skills) can list and install skills
