@@ -136,7 +136,7 @@ The source catalog contains 29 skills. The two additions below are unreleased.
 | [`incident-as-code`](skills/incident-as-code/SKILL.md) | Closes a resolved incident by committing a `docs/solutions/` doc (and a runbook when recurrent) into the affected repo. | An incident is root-caused and fixed, or a postmortem is asked for. |
 | [`learn-capture`](skills/learn-capture/SKILL.md) | The compound loop's closing step: route accreted lessons to durable homes (agent memory vs repo `AGENTS.md`). | After a review, merge, or substantial task, "what did we learn?". |
 | [`goal-prompt`](skills/goal-prompt/SKILL.md) | Turns a loose task into a fire-ready autonomous goal prompt: recon-grounded, rails-locked, with a transcript-checkable terminal condition. Builds the prompt; never fires it. | You want to author a `/goal` or `/deep-research` prompt for a hands-off run. |
-| [`orion-deep-research`](skills/orion-deep-research/SKILL.md) | Research workflow with honest abstention accounting, a bounded knowledge-gap loop, a judge gate, and durable cited reports. Research principles are portable; the executable requires a compatible Claude Workflow tool. Native execution support is unqualified; implementation origin needs author evidence and blocks whole-collection release. | You need a deep, multi-source report and have verified the executor and output prerequisites in the skill. |
+| [`orion-deep-research`](skills/orion-deep-research/SKILL.md) | Research workflow with honest abstention accounting, a bounded knowledge-gap loop, a judge gate, and durable cited reports. Research principles are portable; the executable requires a compatible Claude Workflow tool. Native execution support is unqualified; see the author-attested origin record and its evidence limits. | You need a deep, multi-source report and have verified the executor and output prerequisites in the skill. |
 | [`pre-compact`](skills/pre-compact/SKILL.md) | Captures a session into a persistent, queryable context pack so a fresh instance resumes with zero re-derivation. Engine-agnostic. | Before `/compact`, near the context limit, or handing off in-progress work. |
 | [`x`](skills/x/SKILL.md) | Post to X (Twitter), manually or autonomously, behind a fail-closed safety harness: a redactor that abstains rather than leak, a per-day cap, and an arm-flag so it ships DISARMED. Direct OAuth1.0a, stdlib-only. | An agent should publish a short note to X, safely, manual or hands-off. |
 | [`gist`](skills/gist/SKILL.md) | Publish an embeddable PUBLIC gist of ALREADY-public content, fetched over the unauthenticated raw URL so world-readability is structural, not a promise. Redactor backstop, per-day cap, ships DISARMED, human-gated. The safe pattern for a code surface. | You want to share/embed a file that is already in a public repo, safely. |
@@ -317,10 +317,12 @@ the unrecorded original import revisions. See [THIRD_PARTY_NOTICES.md](THIRD_PAR
 and each adapted skill's `PROVENANCE.md` and license files. Preserve those files
 when copying a skill on its own.
 
-The research implementation's [origin and redistribution evidence](skills/orion-deep-research/PROVENANCE.md)
-remain unresolved. This is a whole-collection release blocker, not evidence of
-infringement or a grant of permission. The existing implementation is retained
-while author evidence is obtained. Tests do not establish native execution or rights.
+The research implementation's [origin record](skills/orion-deep-research/PROVENANCE.md)
+records Dan Mercede's 2026-11-02 attestation that this is his own workflow,
+independently built with Claude's assistance. The original authoring chat was not
+recovered; the record states that evidence limit. Retain its standalone notice.
+Collection publication still requires final qualification and explicit release
+approval. Tests do not establish native execution or rights.
 
 `reassert-guards-on-rewrite` and `apply-review-findings` adapt first-party
 procedures with Dan Mercede's confirmed MIT adaptation rights; Dan maintains

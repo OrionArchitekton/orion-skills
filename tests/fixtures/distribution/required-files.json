@@ -86,6 +86,7 @@
     "scripts/private-state.sh"
   ],
   "orion-deep-research": [
+    "LICENSE.orion",
     "PROVENANCE.md",
     "SKILL.md",
     "SPEC.md",

@@ -10,7 +10,7 @@
 | Consumer invokes after merging, on main. | Advertised trigger reaches an abort on main. | The repaired trigger applies before merge on a feature branch. A later documentation repair needs a separately scoped branch and release diff; do not treat main as this workflow's feature branch. |
 | Consumer has TODOS.md but no `review/TODOS-format.md`, and bundled ship has four steps. | Reference to ship Step 5.5 cannot resolve. | Preserve existing TODOS format, inspect completion evidence from the diff, no external numbered-step dependency. |
 | Research consumer has Node and Python but no Workflow tool. | Invocation asks for an unavailable executor without a prerequisite check. | Stop before invocation; report missing compatible Claude Workflow executor. No plain-Node execution or native-support claim. Separately authorized manual work is labeled manual. |
-| Pure logic and simulated research tests pass. Native execution has not been observed. | Harness-agnostic lineage prose can be read as executable compatibility. | Report local test coverage only; native support unqualified, version 0.1.0 remains the private helper's own version, origin evidence still unresolved. |
+| Pure logic and simulated research tests pass. Native execution has not been observed. | Harness-agnostic lineage prose can be read as executable compatibility. | Report local test coverage only; native support unqualified, version 0.1.0 remains the private helper's own version. Author-attested origin is documented separately and does not establish runtime support. |
 
 Reference audit: SKILL_DIR and RESEARCH_VAULT are consumer-supplied absolute paths.
 The Workflow/agent facilities are explicit user prerequisites. Supporting
