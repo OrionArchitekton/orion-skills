@@ -50,9 +50,9 @@ Claude Code **2.1.316** (the qualified version):
 claude --plugin-dir "/absolute/path/to/orion-skills"
 ```
 
-This source change proposes plugin/collection version **0.7.1**; it has not been
-released. Published **v0.7.0** predates the plugin manifest. Use a reviewed source
-checkout containing `.claude-plugin/plugin.json`, not the v0.7.0 archive.
+The plugin is published in [**v0.7.1**](https://github.com/OrionArchitekton/orion-skills/releases/tag/v0.7.1).
+Use that release's source archive or a checkout of its tag, containing
+`.claude-plugin/plugin.json`. Published **v0.7.0** predates the plugin manifest.
 Invoke bundled skills as `/orion-skills:pre-pr`, `/orion-skills:ship`, etc.
 The same `skills/` tree backs both loading paths. Direct installs above still use
 `/pre-pr` and `/ship`; choose one copy deliberately if you also installed it directly.
@@ -145,7 +145,8 @@ validated as a Codex set.
 
 ## Skills
 
-The source catalog contains 29 skills. The two additions below are unreleased.
+The released catalog contains 29 skills. `reassert-guards-on-rewrite` and
+`apply-review-findings` were added in v0.7.0; v0.7.1 adds optional plugin loading.
 
 | Skill | What it does | Invoke when |
 |---|---|---|
@@ -343,7 +344,7 @@ The research implementation's [origin record](skills/orion-deep-research/PROVENA
 records Dan Mercede's 2026-11-02 attestation that this is his own workflow,
 independently built with Claude's assistance. The original authoring chat was not
 recovered; the record states that evidence limit. Retain its standalone notice.
-Collection publication still requires final qualification and explicit release
+Future collection releases require final qualification and explicit release
 approval. Tests do not establish native execution or rights.
 
 `reassert-guards-on-rewrite` and `apply-review-findings` adapt first-party

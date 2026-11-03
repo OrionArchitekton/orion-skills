@@ -37,20 +37,20 @@ does not need a new skill version. Preserve historical changelog entries and tag
 The research `package.json` version is a private test helper, not the collection
 version; do not bump it or add per-skill versions for a collection release.
 
-The selected additive proposal is 0.7.0: two new procedures bring the source
-catalog to 29 skills. Refresh tags again before any publication; this proposal
-reserves none. Dan Mercede confirmed first-party MIT adaptation rights and
+Published v0.7.0 added two procedures, bringing the catalog to 29 skills;
+published v0.7.1 adds optional Claude Code plugin loading. Refresh tags before
+any future publication; do not replace either release. Dan Mercede confirmed first-party MIT adaptation rights and
 maintenance ownership for both procedures. The separate research origin record
 now accepts Dan's 2026-11-02 independent-authorship attestation, with the original
 chat unavailable and the review's evidence limits explicit. This closes the
-missing-author-record question, not the publication gate: final qualification and
-explicit version/commit release approval remain required. Delegate retains its
-existing absolute-PATH
+missing-author-record question. Both published releases completed final qualification
+and explicit version/commit approval; future releases require their own approval.
+Delegate retains its existing absolute-PATH
 selection behavior; it does not authenticate executable identity. The stricter
-installation policy is separated from this maintenance candidate because it rejects
+installation policy is separated from these releases because it rejects
 previously accepted platforms/layouts. It needs a repair or an explicit scope/version
 decision before adoption; unchanged argv alone is not proof of compatibility. Do not infer rights from tests,
-remove research to evade the hold, or replace an existing tag.
+drop provenance requirements, or replace an existing tag.
 
 ## Source qualification
 
