@@ -123,12 +123,16 @@ validated as a Codex set.
 
 ## Skills
 
+The source catalog contains 29 skills. The two additions below are unreleased.
+
 | Skill | What it does | Invoke when |
 |---|---|---|
 | [`readonly`](skills/readonly/SKILL.md) | Structural read-only session mode, sets a marker a PreToolUse hook reads to DENY the file-editing tools (Edit/Write/MultiEdit/NotebookEdit) until cleared; shell writes via `Bash` are outside the matcher. | An audit/research/census where the file-editing tools should be structurally unavailable, not merely discouraged. |
 | [`scope-guard`](skills/scope-guard/SKILL.md) | Declares + self-audits write scope; with a paired hook, blocks out-of-scope writes mechanically. | Infra or multi-file work where edits must stay inside a boundary. |
 | [`ship`](skills/ship/SKILL.md) | Finish-discipline gates: RED/GREEN tests → PR → adversarial fail-open review → independent runtime verification before "done". | You are about to say "done", "fixed", "deployed", or "shipped". |
 | [`pre-pr`](skills/pre-pr/SKILL.md) | Repo-contract-aware preflight: detect base branch, run repo-local checks, secret-scan the diff, report severity-graded findings. | Before `gh pr create` / pushing a new PR branch. |
+| [`reassert-guards-on-rewrite`](skills/reassert-guards-on-rewrite/SKILL.md) | Traces original guards through a rewrite and probes denial before the protected effect on every affected entry point; includes a synthetic tenant-write example. | Refactoring, porting or replacing guarded behavior. |
+| [`apply-review-findings`](skills/apply-review-findings/SKILL.md) | Revalidates attributed findings at the current target, records evidence-backed dispositions, and binds final verification to immutable source. | Addressing reviews after source or PR state has changed. |
 | [`incident-as-code`](skills/incident-as-code/SKILL.md) | Closes a resolved incident by committing a `docs/solutions/` doc (and a runbook when recurrent) into the affected repo. | An incident is root-caused and fixed, or a postmortem is asked for. |
 | [`learn-capture`](skills/learn-capture/SKILL.md) | The compound loop's closing step: route accreted lessons to durable homes (agent memory vs repo `AGENTS.md`). | After a review, merge, or substantial task, "what did we learn?". |
 | [`goal-prompt`](skills/goal-prompt/SKILL.md) | Turns a loose task into a fire-ready autonomous goal prompt: recon-grounded, rails-locked, with a transcript-checkable terminal condition. Builds the prompt; never fires it. | You want to author a `/goal` or `/deep-research` prompt for a hands-off run. |
@@ -143,7 +147,7 @@ validated as a Codex set.
 | [`prove-deploy-is-live`](skills/prove-deploy-is-live/SKILL.md) | Proves a deploy is actually live via three proofs (version identity, real-route serve, end-to-end behavior), because green CI, `docker ps` healthy, and `/health` 200 all stay green while the running artifact is the old image or the real route is dead. | You are about to call a deploy/restart/cutover "live" or "fixed", or verifying someone else's "it's deployed" claim. |
 | [`prove-control-binds`](skills/prove-control-binds/SKILL.md) | Proves a gate, hook, monitor, or reaper actually fires by injecting a synthetic violation and watching it block from its own output, never by trusting a green check (green has two indistinguishable causes: nothing to catch, or catching nothing). | You are about to report a control "armed"/"protecting"/"done", or auditing one. |
 | [`design-fail-closed-gate`](skills/design-fail-closed-gate/SKILL.md) | Authors unattended and self-policed gates that fail CLOSED by construction: gate on a structured token not free-text prose, bind every green to a re-readable artifact, respect the harness's inverting exit-code semantics, and prove the gate denies before calling it armed. | You are authoring a PreToolUse/pre-commit/pre-push hook, secret scanner, CI merge gate, auto-reaper, or LLM self-review enforcer. |
-| [`author-workflow-fanout`](skills/author-workflow-fanout/SKILL.md) | Lints a Claude Code Workflow fan-out script before launch: flags an `agent()` call with no `.catch` (one rate-limited call rejects the whole run), a budget loop unguarded on `budget.total` (it runs to the 1000-agent cap), and a missing `meta` block; the prose covers the pipeline-vs-barrier and schema-vs-longform choices a linter cannot. | You are authoring or editing a Workflow scriptPath / multi-agent fan-out and want it to fail safe, not silently. |
+| [`author-workflow-fanout`](skills/author-workflow-fanout/SKILL.md) | Lints a Claude Code Workflow fan-out script before launch: flags an `agent()` call with no `.catch` (one rate-limited call rejects the whole run), a budget loop unguarded on `budget.total` (it runs to the 1000-agent cap), and a missing `meta` block. An optional local Node.js 24/POSIX helper preserves exact results and bounds one complete JSON snapshot in UTF-8 bytes; prose-only use remains supported. | You are authoring or editing a Workflow scriptPath / multi-agent fan-out and want it to fail safe, not silently. |
 | [`reprobe-stale-premise`](skills/reprobe-stale-premise/SKILL.md) | Treats any inherited claim you did not just verify (a handoff's "still broken," a teammate's diagnosis, "tool X doesn't exist," a registry's "UNBUILT") as a hypothesis, not a fact, and re-probes live ground truth (fetched origin, real PR state, an actual reproduction) before you act on it. | You're about to fix, build, or rely on something based on a claim you inherited rather than just verified, especially on a shared multi-session box. |
 | [`triage-fanout-verdicts`](skills/triage-fanout-verdicts/SKILL.md) | Reads verify/judge fan-out output by its MECHANISM fields (votes cast, reads completed, verifier errors) instead of its verdict label, so a rate-limited "all refuted" or a dead "survived the skeptic" never coerces into a real verdict; ships a bundled bucketing script that exits 3 on any pending claim. | You're relaying or acting on a fan-out of verify/judge/skeptic verdicts, especially a unanimous one or one that saw rate limits or timeouts. |
 | [`investigate`](skills/investigate/SKILL.md) | Four-phase root-cause debugging discipline (investigate, analyze, hypothesize, implement), gated on a red-capable reproduction you've actually run before any hypothesis, and a regression test that fails before the fix and passes after. | You're asked to debug an error, fix a bug, or figure out why something that used to work just broke. |
@@ -175,6 +179,14 @@ validated as a Codex set.
 - **`pre-pr`**: Before opening a PR, it detects the base branch from repo convention (not
   assuming `main`), greps the diff for credential patterns, and prints a
   `CLEAR | ISSUES` report with BLOCKING / WARNING / INFO findings.
+- **`reassert-guards-on-rewrite`**: A tenant check moves into a shared wrapper.
+  Probe allowed and denied writes through both API and batch paths; a denial
+  passes only when no write occurred. The bundled Python example catches a
+  check moved after the effect even when textual guard counts are unchanged.
+- **`apply-review-findings`**: A review targets an older commit. Re-read each
+  finding at the current revision, distinguish a real defect from an already
+  fixed or gated item, and run proof from immutable source before claiming the
+  final commit resolves it. Hosted PR replies still need their own authority.
 - **`incident-as-code`**: A cache stampede is root-caused and patched. The skill writes
   `docs/solutions/2026-06-17-cache-stampede.md` (with grep-able `symptoms:`) into the
   affected repo and ships it via PR, the incident isn't "closed" until that lands.
@@ -237,6 +249,10 @@ validated as a Codex set.
   `.catch` (a single rate-limited call would reject the whole `parallel()` at 90%) and a
   `while (budget.remaining() ...)` loop with no `budget.total` guard (it would run to the
   hard agent cap). You wrap the call in `.catch(() => null)`, guard the loop, then launch.
+  For a local Node.js consumer, opt into the bundled bounded-results helper:
+  persist each result, emit one byte-bounded snapshot, then recover all originals
+  separately with the saved final count. The recovery path and metadata count
+  toward the snapshot budget; total process memory and disk usage are unbounded.
 - **`reprobe-stale-premise`**: A resumed handoff says "the auth bug is still broken."
   Before touching code, you `git fetch origin` and re-run the failing case: it already
   reproduces clean, someone fixed it hours ago. You report `ALREADY-FIXED` instead of
@@ -305,6 +321,12 @@ The research implementation's [origin and redistribution evidence](skills/orion-
 remain unresolved. This is a whole-collection release blocker, not evidence of
 infringement or a grant of permission. The existing implementation is retained
 while author evidence is obtained. Tests do not establish native execution or rights.
+
+`reassert-guards-on-rewrite` and `apply-review-findings` adapt first-party
+procedures with Dan Mercede's confirmed MIT adaptation rights; Dan maintains
+both. Their standalone provenance notes and Orion MIT notices travel with them.
+The bounded-results helper is original MIT-licensed JavaScript with its own
+bundled notice. These qualifications do not expand the verified Codex starter set.
 
 `learn-capture` operationalizes the **"compound loop"** idea (plan → work → review →
 capture) popularized by [Every](https://every.to)'s writing on compounding engineering.

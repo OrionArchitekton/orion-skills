@@ -1,7 +1,16 @@
 {
+  "apply-review-findings": [
+    "SKILL.md",
+    "PROVENANCE.md",
+    "LICENSE.orion",
+    "references/finding-ledger-example.md"
+  ],
   "author-workflow-fanout": [
     "SKILL.md",
-    "workflow_lint.py"
+    "workflow_lint.py",
+    "LICENSE",
+    "bounded-results.mjs",
+    "docs/runbooks/bounded-results.md"
   ],
   "chain-launcher": [
     "SKILL.md"
@@ -113,6 +122,12 @@
     "hooks/pretooluse-readonly.sh",
     "scripts/readonly-mode.sh",
     "selftest.py"
+  ],
+  "reassert-guards-on-rewrite": [
+    "SKILL.md",
+    "PROVENANCE.md",
+    "LICENSE.orion",
+    "examples/guarded_write.py"
   ],
   "reprobe-stale-premise": [
     "SKILL.md"
