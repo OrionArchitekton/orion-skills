@@ -11,6 +11,9 @@ references:
   - tests/test_distribution_contract.py
   - tests/fixtures/distribution/required-files.json
   - skills/orion-deep-research/PROVENANCE.md
+  - specs/rewrite-and-review-skills-spec.md
+  - specs/bounded-fanout-results-spec.md
+  - skills/author-workflow-fanout/docs/runbooks/bounded-results.md
 ---
 
 # Orion Skills source release
@@ -33,9 +36,12 @@ does not need a new skill version. Preserve historical changelog entries and tag
 The research `package.json` version is a private test helper, not the collection
 version; do not bump it or add per-skill versions for a collection release.
 
-The current maintenance proposal is 0.6.1. It is not publication-ready until
-compatibility is accepted and the research origin question in PROVENANCE.md is
-resolved with author/source evidence. Delegate retains its existing absolute-PATH
+The selected additive proposal is 0.7.0: two new procedures bring the source
+catalog to 29 skills. Refresh tags again before any publication; this proposal
+reserves none. Dan Mercede confirmed first-party MIT adaptation rights and
+maintenance ownership for both procedures. This does not resolve the research
+origin question in PROVENANCE.md, which still blocks collection release until
+author/source evidence is reviewed. Delegate retains its existing absolute-PATH
 selection behavior; it does not authenticate executable identity. The stricter
 installation policy is separated from this maintenance candidate because it rejects
 previously accepted platforms/layouts. It needs a repair or an explicit scope/version
@@ -54,6 +60,14 @@ execution is part of release qualification.
 Git-based fixtures must bound discovery to their disposable root, even when
 HOME or TMPDIR lies beneath a real checkout; isolation must not depend on `/tmp`
 being outside Git.
+
+Python discovery also runs the rewrite/review scenarios and the bounded-results
+Node suite through its Python wrapper. No additional CI dependency is required.
+Run `node tests/bounded_fanout/canary.mjs` (expected exit 0) and the same command
+with `--disabled` (expected exit 1). Both must recover all 150 originals; the
+enabled complete UTF-8 snapshot must fit the 900-byte budget and the disabled
+control must exceed it. Retain exact observed byte counts, including path costs.
+Do not interpret the helper as a Workflow sandbox bridge or a disk/memory bound.
 
 Run the full checks again after any source repair. Review the actual nonempty
 diff for correctness, compatibility and security; record exact reviewed SHA and
@@ -82,12 +96,16 @@ and tree IDs. These are local candidates, not GitHub's eventual post-tag archive
 Before extraction, reject absolute paths, parent traversal, unexpected top-level
 names, duplicate file names, links, devices and special members. Extract only into
 new disposable directories. Compare every member's bytes and executable flag with
-the commit's tracked blobs/modes; require all 27 retained skill folders, root and
+the commit's tracked blobs/modes; require all retained skill folders (29 for this selected candidate), root and
 standalone notices, and mandatory relative files. Run the distribution contracts
 against both extracted trees. Copy each skill alone into another disposable root;
 verify its mandatory files/relative references without relying on sibling skills.
 Exercise representative standalone X/Gist selftests and the readonly hook from
-those copies, in temporary state. No user skill directory is an extraction target.
+those copies, in temporary state. Also run the standalone rewrite example and
+exercise the bounded-results helper's add/snapshot/recover boundary with multibyte
+and oversized results, verifying exact bytes, digests, final count and budget.
+The procedural review skill's fixture proof is illustrative, not native harness
+or hosted-PR qualification. No user skill directory is an extraction target.
 
 Do not infer executable-bit preservation by Windows extractors from Git zip mode
 metadata. Verify the actual intended extractor/platform before advertising support.

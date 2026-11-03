@@ -45,17 +45,15 @@ linter before you launch.
 - **Persist bulk to disk.** Subagents write artifacts to files and return
   pointers or summaries; do not stuff large bodies into `agent()` return values. When you DO
   accumulate many returns, cap and dedupe them in-flight with a small bounded accumulator: budget
-  a total byte cap plus a per-item byte cap, and keep an audit manifest of what was kept versus
-  dropped so the cap is auditable, not silent. A minimal shape:
-  ```js
-  const ctx = new BoundContext({ budgetBytes: 60_000, itemCapBytes: 4_000 })
-  const results = await pipeline(items, d => agent(d.prompt, { schema: SMALL }).catch(() => null))
-  for (const r of results.filter(Boolean)) ctx.add(r.key, JSON.stringify(r))
-  // ctx.retainedBytes stays bounded; ctx.manifest() is the audit tail.
-  ```
-  Build (or reuse) this as a small helper in your own scripts directory (the linter recognizes a
-  `BoundContext` in scope as evidence of a bound accumulator); it does not need to be fancy, just
-  bounded and auditable.
+  a total byte cap plus a per-item byte cap, and preserve complete recoverable
+  artifacts before omitting any inline output. The optional
+  [local JavaScript helper](bounded-results.mjs) provides this boundary for a
+  Node.js consumer; its [usage and recovery guide](docs/runbooks/bounded-results.md)
+  defines the complete JSON byte budget, private storage and explicit failures.
+  It needs filesystem access and cannot run inside a Workflow sandbox. In that
+  sandbox, use the worker's storage interface and verify references yourself.
+  Prose-only usage remains supported; the helper is optional. A recognized helper
+  name is only a linter hint, never proof of persistence or an effective cap.
 - **`.filter(Boolean)` before using results.** A failed thunk resolves to
   `null` in `parallel()`/`pipeline()` output; filter before you map.
 - **No `Date.now()` / `Math.random()`** in the script body (they throw in the

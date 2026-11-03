@@ -6,9 +6,21 @@ an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
 
 ## [Unreleased]
 
-Proposed maintenance version: **0.6.1**, subject to compatibility acceptance and
-resolution of the research implementation's origin/redistribution evidence.
-No release or tag has been created. The collection retains 27 skills.
+Proposed collection version: **0.7.0** under the new-skill MINOR policy, subject
+to resolution of the research implementation's origin/redistribution evidence.
+No release or tag has been created. The source catalog contains 29 skills.
+
+### Added
+
+- **reassert-guards-on-rewrite**: a portable procedure and synthetic tenant-write
+  example for verifying that moved guards still deny before the protected effect.
+- **apply-review-findings**: a portable procedure and worked ledger for revalidating
+  attributed findings at the current target and verifying immutable final source.
+  Dan Mercede confirmed MIT adaptation rights and maintains both new procedures.
+- **author-workflow-fanout**: optional local Node.js 24/POSIX helper that persists
+  exact UTF-8 results before acceptance, bounds one complete serialized snapshot
+  in bytes, and recovers every result with digest and final-count verification.
+  Prose-only use remains supported; process/disk/recovery memory are unbounded.
 
 ### Fixed
 
