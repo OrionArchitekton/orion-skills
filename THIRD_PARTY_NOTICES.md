@@ -63,7 +63,10 @@ SOFTWARE.
 
 ## Research implementation
 
-Origin and redistribution evidence remain unresolved; see
-[the provenance question](skills/orion-deep-research/PROVENANCE.md). No permission
-is inferred for native-derived material. Whole-collection release is held until
-author evidence is reviewed. Existing implementation bytes are retained.
+See the [author-attested origin record](skills/orion-deep-research/PROVENANCE.md).
+On 2026-11-02 Dan Mercede stated that this is his own workflow, independently
+built with Claude's assistance, and authorized recording that statement. The
+project accepts that attestation as the origin basis for MIT distribution;
+the original authoring chat was not recovered. No permission for third-party
+native Claude code is inferred. Existing implementation bytes are retained.
+Preserve the skill's `LICENSE.orion` and provenance notice in standalone copies.

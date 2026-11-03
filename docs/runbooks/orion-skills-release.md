@@ -14,6 +14,7 @@ references:
   - specs/rewrite-and-review-skills-spec.md
   - specs/bounded-fanout-results-spec.md
   - skills/author-workflow-fanout/docs/runbooks/bounded-results.md
+  - skills/reprobe-stale-premise/docs/runbooks/structured-probes.md
 ---
 
 # Orion Skills source release
@@ -39,9 +40,12 @@ version; do not bump it or add per-skill versions for a collection release.
 The selected additive proposal is 0.7.0: two new procedures bring the source
 catalog to 29 skills. Refresh tags again before any publication; this proposal
 reserves none. Dan Mercede confirmed first-party MIT adaptation rights and
-maintenance ownership for both procedures. This does not resolve the research
-origin question in PROVENANCE.md, which still blocks collection release until
-author/source evidence is reviewed. Delegate retains its existing absolute-PATH
+maintenance ownership for both procedures. The separate research origin record
+now accepts Dan's 2026-11-02 independent-authorship attestation, with the original
+chat unavailable and the review's evidence limits explicit. This closes the
+missing-author-record question, not the publication gate: final qualification and
+explicit version/commit release approval remain required. Delegate retains its
+existing absolute-PATH
 selection behavior; it does not authenticate executable identity. The stricter
 installation policy is separated from this maintenance candidate because it rejects
 previously accepted platforms/layouts. It needs a repair or an explicit scope/version
@@ -106,6 +110,13 @@ exercise the bounded-results helper's add/snapshot/recover boundary with multiby
 and oversized results, verifying exact bytes, digests, final count and budget.
 The procedural review skill's fixture proof is illustrative, not native harness
 or hosted-PR qualification. No user skill directory is an extraction target.
+
+For the optional structured premise helper, copy only `reprobe-stale-premise` to
+a disposable directory. Exercise a fresh confirmed observation, modify the
+synthetic file, then require a drifted result and nonzero gate status; also
+exercise missing and unknown outcomes. Retain the runbook's local-filesystem,
+metadata disclosure and race limitations. The helper does not qualify new native
+host behavior or expand the existing Codex starter pin.
 
 Do not infer executable-bit preservation by Windows extractors from Git zip mode
 metadata. Verify the actual intended extractor/platform before advertising support.

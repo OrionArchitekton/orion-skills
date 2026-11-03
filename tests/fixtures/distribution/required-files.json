@@ -86,6 +86,7 @@
     "scripts/private-state.sh"
   ],
   "orion-deep-research": [
+    "LICENSE.orion",
     "PROVENANCE.md",
     "SKILL.md",
     "SPEC.md",
@@ -130,7 +131,11 @@
     "examples/guarded_write.py"
   ],
   "reprobe-stale-premise": [
-    "SKILL.md"
+    "SKILL.md",
+    "premise_probes.py",
+    "LICENSE.orion",
+    "PROVENANCE.md",
+    "docs/runbooks/structured-probes.md"
   ],
   "scope-guard": [
     "SKILL.md"

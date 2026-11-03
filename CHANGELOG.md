@@ -7,11 +7,14 @@ an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
 ## [Unreleased]
 
 Proposed collection version: **0.7.0** under the new-skill MINOR policy, subject
-to resolution of the research implementation's origin/redistribution evidence.
+to final qualification and explicit version/commit release approval.
 No release or tag has been created. The source catalog contains 29 skills.
 
 ### Added
 
+- **reprobe-stale-premise**: optional bounded read-only local file observations
+  with explicit confirmed, drifted/refuted, missing and unknown results. Manual
+  checks and the existing Codex qualification pin remain unchanged.
 - **reassert-guards-on-rewrite**: a portable procedure and synthetic tenant-write
   example for verifying that moved guards still deny before the protected effect.
 - **apply-review-findings**: a portable procedure and worked ledger for revalidating
@@ -40,7 +43,9 @@ No release or tag has been created. The source catalog contains 29 skills.
 - Release documentation runs on the feature branch before merge. Pre-PR review
   maps changed behavior to tests or worked scenarios.
 - Adapted skills retain upstream and Orion notices in standalone copies. Research
-  docs name executor prerequisites and the unresolved collection release hold.
+  docs name executor prerequisites and record Dan Mercede's independent-authorship
+  attestation with its evidence limits. Collection publication remains held for
+  final qualification and explicit release approval; native support is unqualified.
 - Delegate documentation corrects the absolute-path trust claim. A stricter
   installation policy is deferred for an explicit platform/layout and version
   decision; this candidate preserves existing executable-selection behavior.

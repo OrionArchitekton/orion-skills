@@ -1,6 +1,6 @@
 ---
 name: orion-deep-research
-description: Use when a multi-source, fact-checked research report must persist in a research vault with explicit uncertainty and verification provenance. The bundled executable requires a compatible Claude Workflow executor; see prerequisites and the unresolved origin record before use or redistribution.
+description: Use when a multi-source, fact-checked research report must persist in a research vault with explicit uncertainty and verification provenance. The bundled executable requires a compatible Claude Workflow executor; see prerequisites and the author-attested origin record before use or redistribution.
 ---
 
 # orion-deep-research
@@ -12,10 +12,11 @@ persistence. Those principles can guide research in other harnesses; they do not
 make the bundled executable portable to those harnesses.
 
 See `SPEC.md` for the behavior contract and `lib/*.mjs` (`npm test`) for the pure
-logic checks. The original history describes a native fork; its implementation
-origin and redistribution basis remain unresolved. See [provenance and the exact
-open question](PROVENANCE.md). Preserve that blocker for whole-collection release;
-local tests cannot establish rights or native compatibility.
+logic checks. Dan Mercede attests that this is his own workflow, independently
+built with Claude's assistance. See the [origin record and its evidence limits](PROVENANCE.md).
+Preserve that record and `LICENSE.orion` in standalone copies. Publication still
+requires final qualification and approval; local tests cannot establish rights
+or native compatibility.
 
 ## Execution prerequisites and limits
 

@@ -59,9 +59,23 @@ The local working tree, the **unfetched** `origin/main` ref, and the session nar
 
 This consolidates a family of recurring premise-drift failures seen across multi-session, multi-owner operation: a stale "still broken" handoff, a "tool doesn't exist" search that missed an alias, blind trust in an inherited root-cause line number, an unfetched-origin false negative, and a push-to-merged-branch orphan recreation. Counterpart: a settled design decision you have made is asserted once, not re-litigated; this skill is for an unverified claim about live state, which you re-probe instead. Escalation: when the implied action is itself a shared-state mutation (a commit/push into a shared checkout, closing a shared board item, a registry write), stand down and verify first: probe for a concurrent owner, claim the work atomically, and confirm the change landed before you consider it closed.
 
+## Optional structured local probes
+
+For bounded local file checks, you may explicitly run the optional
+[premise helper](premise_probes.py). Its [contract and runbook](docs/runbooks/structured-probes.md)
+define the JSON schema, limits and read-only boundary. It supports regular-file
+existence, literal content and exact file SHA-256. It never runs the Git, network
+or operator commands above; keep using the manual procedure for those checks.
+
+`confirmed`, `drifted` (refuted), `missing` and `unknown` remain distinct. Only a
+nonempty set of entirely confirmed observations passes. A successful predicate
+does not prove a broader claim or authorize an action. Local helper tests do not
+extend native-host qualification or change the existing installer pin. Retain
+the [MIT notice](LICENSE.orion) and [provenance note](PROVENANCE.md) with standalone copies.
+
 ## Boundary
 
-This is the premise-verification discipline, not a tool. The concrete mechanics, which
+The manual procedure remains the premise-verification discipline. The concrete mechanics, which
 registry or handoff format you use, how your CI/CD reports deploy state, your branch and
 PR conventions, belong to your own repo doctrine. The invariant is the shape: never act on
 an inherited claim you have not re-probed this session, and never conclude absence from a

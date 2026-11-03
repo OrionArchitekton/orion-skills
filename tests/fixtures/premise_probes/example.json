@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "premises": [
+    {
+      "id": "exists",
+      "claim": "A synthetic configuration file exists",
+      "probe": {
+        "kind": "path_exists",
+        "path": "config.txt"
+      }
+    },
+    {
+      "id": "literal",
+      "claim": "The synthetic feature flag is enabled",
+      "probe": {
+        "kind": "file_contains",
+        "path": "config.txt",
+        "expect": "feature=enabled"
+      }
+    },
+    {
+      "id": "digest",
+      "claim": "Synthetic configuration bytes match the fixture",
+      "probe": {
+        "kind": "file_sha256",
+        "path": "config.txt",
+        "expect": "2e942b42988244385ce39d893ef5065b887679c4c06cf819e4ce59b7b8896303"
+      }
+    }
+  ]
+}
