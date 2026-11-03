@@ -195,7 +195,7 @@ def summarize(results):
 
 def report(document, root):
     try:
-        if (len(json.dumps(document).encode()) > MAX_INPUT or not isinstance(document, dict)
+        if (len(json.dumps(document, ensure_ascii=False, separators=(',', ':')).encode('utf-8')) > MAX_INPUT or not isinstance(document, dict)
                 or set(document) != {'schema_version', 'premises'}
                 or type(document['schema_version']) is not int or document['schema_version'] != 1
                 or not isinstance(document['premises'], list)
@@ -229,14 +229,17 @@ def main(argv=None):
     parser.add_argument('--root', required=True)
     parser.add_argument('--input', required=True)
     args = parser.parse_args(argv)
-    absolute = os.path.abspath(args.input)
     try:
+        # Preserve original components: abspath would erase symlink/.. evidence.
+        absolute = args.input if args.input.startswith('/') else os.getcwd() + '/' + args.input
         data, _ = observe(os.path.dirname(absolute), os.path.basename(absolute), limit=MAX_INPUT)
         document = json.loads(data.decode('utf-8'), object_pairs_hook=unique_object,
                               parse_constant=invalid_constant)
         output = report(document, args.root)
     except Unavailable as exc:
         output = summarize([unknown(str(exc))])
+    except OSError:
+        output = summarize([unknown('unavailable_input')])
     except (ValueError, RecursionError):
         output = summarize([unknown('invalid_document')])
     rendered = json.dumps(output, separators=(',', ':'))

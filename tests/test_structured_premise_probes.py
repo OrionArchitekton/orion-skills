@@ -268,6 +268,39 @@ class PremiseProbesTest(unittest.TestCase):
                     self.assertTrue(resolved.is_file())
                     self.assertTrue(resolved.is_relative_to(standalone))
 
+    def test_valid_multibyte_manifest_uses_utf8_byte_bound(self):
+        (self.root / 'config.txt').write_text('enabled')
+        document = {'schema_version': 1, 'premises': [
+            {**self.premise('path_exists', id=f'p{i}'), 'claim': 'é' * 1024}
+            for i in range(16)]}
+        self.input.write_text(json.dumps(document, ensure_ascii=False, separators=(',', ':')),
+                              encoding='utf-8')
+        self.assertLess(len(self.input.read_bytes()), 65536)
+        proc = subprocess.run([sys.executable, '-B', str(HELPER), '--root', str(self.root),
+                               '--input', str(self.input)], cwd=self.home, env=self.env,
+                              capture_output=True, text=True, timeout=5)
+        self.assertEqual(proc.stderr, '')
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        self.assertEqual(json.loads(proc.stdout)['counts']['confirmed'], 16)
+
+    def test_manifest_path_cannot_be_lexically_redirected(self):
+        (self.root / 'config.txt').write_text('enabled')
+        outside = self.base / 'outside'
+        (outside / 'deep').mkdir(parents=True)
+        (self.base / 'link').symlink_to(outside / 'deep', target_is_directory=True)
+        valid = {'schema_version': 1, 'premises': [self.premise()]}
+        invalid = {'schema_version': 1, 'premises': [self.premise(path='missing')]}
+        (self.base / 'selected.json').write_text(json.dumps(valid))
+        (outside / 'selected.json').write_text(json.dumps(invalid))
+        selected = str(self.base / 'link') + '/../selected.json'
+        for path in (selected, str(self.base) + '/./selected.json'):
+            proc = subprocess.run([sys.executable, '-B', str(HELPER), '--root', str(self.root),
+                                   '--input', path], cwd=self.home, env=self.env,
+                                  capture_output=True, text=True, timeout=5)
+            self.assertEqual(proc.stderr, '')
+            self.assertEqual(proc.returncode, 1, proc.stdout)
+            self.assertEqual(json.loads(proc.stdout)['results'][0]['status'], 'unknown')
+
 
 if __name__ == '__main__':
     unittest.main()

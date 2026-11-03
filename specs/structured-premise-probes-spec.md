@@ -60,7 +60,9 @@ duplicate IDs invalidate the whole document to prevent ambiguous attribution.
 
 ## Bounds and stability
 
-Manifest input is a regular non-symlink file limited to 65536 bytes. Content reads
+Manifest input is a regular non-symlink file limited to 65536 UTF-8 bytes.
+Its original path components are checked without normalizing away symlinks or
+dot/dot-dot segments. Compact UTF-8 bounds also apply to the module entrypoint. Content reads
 are limited to 1048576 bytes per source; at most one extra byte detects growth.
 Existence reads no content. Output is at most 65536 UTF-8 bytes, with fixed reason
 codes and bounded identifiers, metadata and hashes. Unsupported POSIX descriptor

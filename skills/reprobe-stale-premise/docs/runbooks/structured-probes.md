@@ -45,7 +45,9 @@ and source paths cannot contain symlinks or dot/dot-dot components. Source paths
 are relative, at most 240 ASCII characters / 16 nonempty components, using
 letters, digits, dot, underscore, hyphen and slash. Directories, sockets, FIFOs,
 devices and other nonregular targets are unknown. Manifest is a regular file,
-maximum 65536 bytes; source content maximum 1048576 bytes per probe. One extra
+maximum 65536 UTF-8 bytes; original manifest path components are preserved and
+checked without dot/dot-dot normalization. Source content maximum 1048576 bytes
+per probe. One extra
 byte detects growth. JSON duplicate keys, nonfinite numbers and malformed inputs
 fail closed. Maximum stdout is 65536 bytes; there is no report-file write flag.
 
