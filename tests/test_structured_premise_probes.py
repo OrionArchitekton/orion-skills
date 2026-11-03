@@ -336,6 +336,43 @@ class PremiseProbesTest(unittest.TestCase):
         self.assertEqual(result['status'], 'unknown')
         self.assertEqual(result['reason'], 'changed_during_read')
 
+    def test_missing_source_with_disappearing_root_is_unknown(self):
+        from unittest.mock import patch
+        module = self.load_module()
+        real_stat = os.stat
+        changed = False
+        def disappearing_root(path, *args, **kwargs):
+            nonlocal changed
+            if path == 'config.txt' and not changed:
+                changed = True
+                self.root.rename(self.base / 'moved-source')
+            return real_stat(path, *args, **kwargs)
+        try:
+            with patch.object(module.os, 'stat', side_effect=disappearing_root):
+                result = module.report({'schema_version': 1, 'premises': [self.premise()]},
+                                       str(self.root))['results'][0]
+        except OSError:
+            self.fail('missing source plus disappearing root must remain a structured unknown')
+        self.assertEqual(result['status'], 'unknown')
+        self.assertEqual(result['reason'], 'changed_during_read')
+
+    def test_missing_source_with_denied_ancestor_recheck_is_unknown(self):
+        from unittest.mock import patch
+        module = self.load_module()
+        real_stat = os.stat
+        def denied_recheck(path, *args, **kwargs):
+            if path == 'source':
+                raise PermissionError('private denial')
+            return real_stat(path, *args, **kwargs)
+        try:
+            with patch.object(module.os, 'stat', side_effect=denied_recheck):
+                result = module.report({'schema_version': 1, 'premises': [self.premise()]},
+                                       str(self.root))['results'][0]
+        except OSError:
+            self.fail('ancestor recheck error must remain a structured unknown')
+        self.assertEqual(result['status'], 'unknown')
+        self.assertIsNone(result['source'])
+
 
 if __name__ == '__main__':
     unittest.main()

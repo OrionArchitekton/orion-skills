@@ -66,16 +66,19 @@ def observe(root, relative, content=True, limit=MAX_FILE):
             return fd
 
         def directories_stable():
-            for fd, before, parent_fd, name, watch in directories:
-                current = signature(os.fstat(fd))
-                # Unrelated siblings in root ancestors do not invalidate a read.
-                if (current if watch else current[:3]) != (before if watch else before[:3]):
-                    return False
-                if parent_fd is not None:
-                    named = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-                    if signature(named)[:3] != current[:3]:
+            try:
+                for fd, before, parent_fd, name, watch in directories:
+                    current = signature(os.fstat(fd))
+                    # Unrelated siblings in root ancestors do not invalidate a read.
+                    if (current if watch else current[:3]) != (before if watch else before[:3]):
                         return False
-            return True
+                    if parent_fd is not None:
+                        named = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                        if signature(named)[:3] != current[:3]:
+                            return False
+                return True
+            except OSError:
+                return False
 
         try:
             parent = directory('/')
