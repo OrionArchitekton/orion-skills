@@ -4,6 +4,16 @@ All notable changes to the orion-skills library. This project follows Semantic
 Versioning (https://semver.org): adding a skill is a MINOR bump, a non-breaking change to
 an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
 
+## Unreleased — compatibility decision pending
+
+- Delegate rejects relative and workspace-controlled CLI selections before launch,
+  checks intermediate symlinks and rechecks the selected launcher before spawning.
+  Outside custom, user, system and manager-shim layouts retain launcher identity.
+- This intentionally breaks workspace-local/relative installs previously accepted.
+  Recommend a MAJOR release if adopted; no version/tag or plugin manifest bump is
+  made here. See `docs/runbooks/delegate-executable-selection.md` for the fixture
+  compatibility matrix, migration and unqualified native-platform boundaries.
+
 ## [0.7.1] - 2026-11-02
 
 Published at `13ee89202f6a730e8b79326343bb885d0a82eda5` with a compatible optional

@@ -13,7 +13,7 @@ tool calls). Security rails are enforced in code and asserted by tests:
   - NEVER emits a sandbox-bypass flag (see BYPASS_FLAGS);
   - scrubs the child env to a least-privilege WHITELIST (no sibling-provider keys, no
     GH/Slack/secret-manager tokens, no ANTHROPIC key);
-  - retains an absolute PATH selection (not an executable trust check);
+  - rejects workspace-controlled CLI paths while retaining outside launcher identity;
   - defaults the codex sandbox to read-only (workspace-write only on explicit opt-in);
   - codex stdin is /dev/null (guards the >=0.120 non-TTY exec deadlock).
 
@@ -26,10 +26,12 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 TARGETS = frozenset({"codex", "grok", "gemma"})
 
@@ -69,12 +71,56 @@ class DelegateError(Exception):
     """Raised on an unknown target, a missing CLI, or an invalid delegation request."""
 
 
+def _workspace_root() -> Path:
+    """Nearest enclosing Git workspace, or cwd for a non-Git caller."""
+    cwd = Path.cwd().resolve(strict=True)
+    for directory in (cwd, *cwd.parents):
+        if (directory / ".git").exists():
+            return directory
+    return cwd
+
+
+def _validate_cli(path: str) -> str:
+    """Exclude workspace paths; retain the selected launcher, not its target."""
+    candidate = Path(path)
+    try:
+        workspace = _workspace_root()
+        if not candidate.is_absolute():
+            raise DelegateError("CLI selection must use an absolute PATH entry")
+        # Walk symlinks explicitly: checking only the final realpath misses
+        # outside -> workspace -> outside chains and `link/../name` traversal.
+        current = Path(candidate.anchor)
+        pending = list(candidate.parts[1:])
+        links = 0
+        while pending:
+            part = pending.pop(0)
+            current = current.parent if part == ".." else current / part
+            if current.is_relative_to(workspace) or current.samefile(workspace):
+                raise DelegateError("refusing workspace-controlled CLI selection")
+            info = current.lstat()
+            if (stat.S_ISLNK(info.st_mode)
+                    or getattr(current, "is_junction", lambda: False)()):
+                links += 1
+                if links > 40:
+                    raise DelegateError("CLI symlink chain is cyclic or too deep")
+                target = current.readlink()
+                current = Path(target.anchor) if target.is_absolute() else current.parent
+                pending = list(target.parts[1:] if target.is_absolute() else target.parts) + pending
+            elif pending and not stat.S_ISDIR(info.st_mode):
+                raise DelegateError("CLI path traverses a non-directory")
+        if not current.is_file() or not os.access(current, os.X_OK):
+            raise DelegateError("CLI selection is not an executable file")
+    except (OSError, RuntimeError) as exc:
+        raise DelegateError("CLI path could not be checked") from exc
+    return str(candidate)
+
+
 def resolve_cli(name: str) -> str:
-    """Absolute PATH selection, or raise. This is not an executable trust check."""
+    """Validate the first PATH hit; never fall back after an unsafe selection."""
     path = shutil.which(name)
     if not path:
         raise DelegateError(f"CLI not found on PATH: {name!r}")
-    return os.path.abspath(path)
+    return _validate_cli(path)
 
 
 def _assert_no_bypass(argv: list) -> list:
@@ -181,6 +227,8 @@ def dispatch(target: str, task: str, *, write: bool = False, model=None, timeout
 
     argv = build_argv(target, task, write=write, model=model)
     env = scrub_env(target)
+    # Recheck this exact launcher, without reselecting PATH, after argv/env setup.
+    _validate_cli(argv[0])
     try:
         proc = subprocess.run(
             argv, env=env,

@@ -59,17 +59,35 @@ delegate.fanout([
   commonly bake those in; this layer exists partly to avoid that.
 - Child env is a least-privilege WHITELIST: base keys + ONLY the target's own key; no
   sibling-provider keys, no GH/Slack/secret-manager/Anthropic tokens.
-- Child CLI selection is converted to an absolute path with `shutil.which` before
-  spawning. This preserves the selected path; it does not authenticate the executable.
-  An unsafe or current-directory PATH entry can still select a planted binary.
-  Review PATH and the selected installation before delegation. A stricter installation
-  policy is deferred pending an explicit supported-platform/layout compatibility decision.
+- Child CLI selection must be an absolute first PATH hit outside the workspace.
+  Each traversed symlink/junction is checked, and the exact selected launcher is
+  checked again immediately before dispatch; launcher identity is preserved.
+  Unsafe selections raise `DelegateError`, with no fallback to another CLI.
+  This is workspace path exclusion, not publisher/binary authentication.
 - codex sandbox defaults read-only; `--write` escalates to `workspace-write` (never `danger-full-access`).
 - codex stdin is `/dev/null` (guards the >=0.120 non-TTY exec deadlock).
 - **Rule of Two:** a delegate acting on untrusted input must not also hold private access AND
   unsandboxed/consequential output at once. Keep the sandbox read-only unless you have vetted the input.
 
 ## Gotchas
+
+- **Compatibility change proposed for the next MAJOR release:** relative/empty PATH
+  selections and even intentional workspace-local CLI installs are now denied.
+  System, user, custom and group-writable absolute installations outside the
+  workspace remain accepted; no fixed installation allowlist is used.
+  Workspace means the nearest enclosing `.git` marker, otherwise cwd. Start a
+  non-Git call at the intended workspace root; nested repos define separate roots.
+  Choose a vetted external installation deliberately; do not bypass denial by
+  pointing an outside symlink back into the workspace. No version is reserved.
+- The OS, caller cwd/marker selection, outside installation writers and launcher
+  contents are trusted. Interpreters, dependencies, inherited PATH and HOME access
+  are unchanged. Hard-link/mount aliases and same-user replacement after the last
+  check are not prevented. Use OS isolation for hostile code. Native Windows and
+  macOS process execution remain unqualified; Linux fixture results are not native
+  platform certification.
+- The helper assignment above remains a deliberate direct-install path. Plugin-only
+  helper resolution is not qualified by this change, and loading grants no
+  execution permission.
 
 - grok/gemma need their config at call time: an `XAI_API_KEY` for grok, an `OLLAMA_HOST` pointed
   at your endpoint for gemma. Without them the run fails honestly (no silent fallback). A shell
