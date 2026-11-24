@@ -25,6 +25,42 @@ nouns you remembered to enumerate. For real source that is the wrong tool. So
 The fetch *is* the guard. It cannot be satisfied by private content, so there is
 no path by which estate/internal code reaches a gist.
 
+## Public Technical Identifier Allowlist and Anti-Safety-Fog Mandate
+
+Public derivation must separate **private estate topology** (node hostnames, tailnet
+IPs, Doppler/provider secrets, internal repo paths, customer PII) from **public
+computer-science terminology**. Over-redacting standard public identifiers into vague
+bureaucracy ("a redirecting setting in the version control system") destroys engineering
+credibility without protecting any secret.
+
+The versioned allowlist at
+[public-technical-identifiers.v1.json](public-technical-identifiers.v1.json)
+(`schema_version: "public-technical-allowlist/v1"`, `version: "1.0.0"`) defines
+standard public identifiers that **must survive verbatim** when authoring or deriving
+public copy:
+
+- **CLI commands and flags**: `git`, `--work-tree`, `--git-dir`, `-C`, `systemd`,
+  `systemctl`, `pytest`, `ffmpeg`, `ffprobe`, `ruff`, `mypy`, `gitleaks`, `docker`
+- **Git env and config keys**: `GIT_WORK_TREE`, `GIT_DIR`, `GIT_ALLOW_PROTOCOL`,
+  `core.worktree`, `core.bare`, `extensions.partialclone`
+- **RFCs and standards**: `RFC 8058`, `RFC 6598`, `RFC 1918`, `JSON-LD`, `C2PA`, `IPTC`,
+  `DKIM`, `DMARC`, `SPF`
+- **Public error identifiers**: `NXDOMAIN`, `ECONNREFUSED`, `SIGKILL`, `HTTP 401`,
+  `HTTP 403`, `DID NOT RAISE`, `NotImplementedError`, `exit 0`, `exit 1`
+- **OSS libraries and documented APIs**: `pydantic`, `trafilatura`, `docling`, `spacy`,
+  `datasketch`, `sentence-transformers`, `promptfoo`, `List-Unsubscribe-Post`,
+  `containsSyntheticMedia`, `youtube.videos.insert`
+
+Allowlist precedence is strictly fail-closed:
+
+- An exact allowlisted identifier only suppresses generic long-token entropy hits (for
+  example 40+ char CLI flags or OpenTelemetry env var names).
+- Explicit secret prefixes (`dp.*`, `sk-*`, `ghp_*`, `AKIA*`, `Bearer`, JWTs, PEM keys),
+  tailnet IPs (`100.64/10`), RFC-1918 IPs, private hosts (`*.internal`, `*.local`,
+  custom hostnames), `/home/*` paths, customer PII (emails, SSNs, phone numbers), and
+  custom denylist matches **always hard-block (`ABSTAIN`)**, even when juxtaposed with
+  an allowlisted term such as `GIT_WORK_TREE=sk-proj-...`.
+
 ## The redactor is a backstop here, and it false-positives
 
 The shared `redactor.py` still runs over the fetched content, but on this path a

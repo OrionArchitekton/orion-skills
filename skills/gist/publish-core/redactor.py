@@ -4,13 +4,13 @@
 A public surface (X, a blog, a gist) often has NO platform-side secret/PII
 scanner. So private material must be caught HERE before it ships. Policy: a
 denylist of private tokens + ABSTAIN-if-uncertain (fail-closed). If a candidate
-carries any denylisted proper noun, host, identity, or secret-shaped token, the
-verdict is ABSTAIN: do NOT publish, surface to a human to genericize.
+carries any denylisted proper noun, host, identity, PII, or secret-shaped token,
+the verdict is ABSTAIN: do NOT publish, surface to a human to genericize.
 
-Two layers of patterns:
+Two layers of patterns plus a bounded public-identifier allowlist:
   * BUILT-IN UNIVERSAL (below), secret-shaped tokens, RFC-1918/CGNAT IPs,
-    private-key headers, *.internal/.local hosts, /home//Users absolute paths.
-    Useful for everyone, always on.
+    private-key headers, *.internal/.local hosts, /home//Users absolute paths,
+    and customer PII (emails, SSNs, phone numbers). Useful for everyone, always on.
   * YOUR CUSTOM DENYLIST (loaded from a file OUTSIDE this skill), your org's
     hostnames, repo/product names, client identities, internal email domains.
     Default: ~/.claude/config/x-denylist.txt (override with $X_DENYLIST_FILE).
@@ -18,6 +18,12 @@ Two layers of patterns:
     updates AND you never accidentally publish your own denylist if you share
     the skill. Copy publish-core/x-denylist.sample.txt to that path and edit.
     See references/REDACTOR-DENYLIST.md.
+  * PUBLIC TECHNICAL IDENTIFIER ALLOWLIST (references/public-technical-identifiers.v1.json),
+    standard public CLI commands/flags, git env/config keys, RFCs, public error
+    codes, OSS libraries, and documented APIs. Exact allowlisted identifiers only
+    exempt generic long-token entropy matches so public CS terminology survives
+    verbatim; explicit secrets, IPs, private hosts, internal paths, customer PII,
+    and custom denylist rules NEVER yield to the allowlist.
 
 A denylist is a backstop, not a proof. For machine-screening real source code,
 pair it with an entropy/allowlist secret scanner (gitleaks/trufflehog-class) and
@@ -32,6 +38,7 @@ CLI:
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import stat
@@ -40,15 +47,21 @@ from pathlib import Path
 
 CUSTOM_PATH = Path(os.environ.get(
     "X_DENYLIST_FILE", str(Path.home() / ".claude" / "config" / "x-denylist.txt")))
+ALLOWLIST_PATH = (
+    Path(__file__).resolve().parent.parent / "references" / "public-technical-identifiers.v1.json"
+)
+_ALLOWLIST_SCHEMA = "public-technical-allowlist/v1"
 
 _BUILTIN = []
+_GENERIC_ENTROPY_CLASS = "secret"
+_GENERIC_ENTROPY_PATTERN = r"\b[A-Za-z0-9_\-]{40,}\b"
 
 
-def _add(cls: str, pattern: str, flags=re.IGNORECASE):
-    _BUILTIN.append((cls, re.compile(pattern, flags)))
+def _add(cls: str, pattern: str, flags=re.IGNORECASE, *, allowlist_exempt: bool = False):
+    _BUILTIN.append((cls, re.compile(pattern, flags), allowlist_exempt))
 
 
-# ─── BUILT-IN UNIVERSAL (always on; no editing needed) ─────────────────────
+# --- BUILT-IN UNIVERSAL (always on; no editing needed) ---
 # Private network coordinates.
 _add("internal-ip", r"\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3})\b")
 _add("internal-ip", r"\b(?:192\.168\.\d{1,3}\.\d{1,3})\b")
@@ -59,18 +72,96 @@ _add("internal-host", r"\b[\w.-]+\.(?:internal|local|svc\.cluster\.local)\b")
 # Absolute home/workspace paths that pin an author/machine (matters for code).
 _add("internal-path", r"/home/[A-Za-z0-9._-]+/[A-Za-z0-9._/-]+")
 _add("internal-path", r"/Users/[A-Za-z0-9._-]+/[A-Za-z0-9._/-]+")
+# Customer / personal PII. Never allowlisted.
+_add("pii", r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+_add("pii", r"\b\d{3}-\d{2}-\d{4}\b")
+_add("pii", r"(?<!\d)\d{3}\s\d{2}\s\d{4}(?!\d)")
+_add("pii", r"\b(?:ssn|social\s+security(?:\s+(?:no|num|number))?)\s*(?:is|[:=#-])?\s*\d{9}\b")
+_add("pii", r"(?<!\d)(?:\+1[-.\s]?)?\(\d{3}\)[-.\s]?\d{3}[-.\s]?\d{4}(?!\d)")
+_add("pii", r"(?<!\d)(?:\+1[-.\s]?)?\d{3}[-.\s]\d{3}[-.\s]\d{4}(?!\d)")
+_add(
+    "pii",
+    r"(?<![A-Za-z0-9.])\+(?:1[-.\s]?(?:\(\d{3}\)[-.\s]?|\d{3}[-.\s]?)\d{3}[-.\s]?\d{4}|[1-9](?:[-.\s()]{0,2}\d){7,14})(?![A-Za-z0-9])",
+)
+_add("pii", r"(?<![A-Za-z0-9.])[2-9]\d{2}[2-9]\d{6}(?![A-Za-z0-9.])")
 # Secret-shaped tokens (high-entropy / known prefixes). Fail-closed.
 _add("secret", r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----")
 _add("secret", r"\b(?:Bearer|bearer)\s+[A-Za-z0-9._\-]{16,}\b")
 _add("secret", r"\b(?:AKIA|ASIA)[A-Z0-9]{12,}\b")
-_add("secret", r"\b(?:sk|pk|rk|ghp|gho|ghs|glpat|xoxb|xoxp)[-_][A-Za-z0-9]{16,}\b")
+_add("secret", r"\b(?:sk|pk|rk|ghp|gho|ghs|glpat|xoxb|xoxp)[-_][A-Za-z0-9_-]{16,}\b")
 _add("secret", r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{6,}\b")
 _add("secret", r"\bdp\.[A-Za-z0-9._-]{6,}\b")
-_add("secret", r"\b[A-Za-z0-9_\-]{40,}\b")
+_add(_GENERIC_ENTROPY_CLASS, _GENERIC_ENTROPY_PATTERN, allowlist_exempt=True)
 
 
 class RedactionConfigError(ValueError):
     """Configured protection could not be loaded; contains no private rules."""
+
+
+def load_public_allowlist(path: Path | None = None) -> tuple[str, frozenset[str]]:
+    """Load the versioned Public Technical Identifier Allowlist fail-closed.
+
+    An absent default ALLOWLIST_PATH returns an empty set; an explicit path, a
+    symlink, an unreadable file, or malformed schema raises RedactionConfigError.
+    """
+    target = path if path is not None else ALLOWLIST_PATH
+    if target.is_symlink():
+        raise RedactionConfigError("allowlist: symlink-rejected")
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    fd = -1
+    try:
+        fd = os.open(target, flags)
+    except FileNotFoundError as exc:
+        if path is not None or target.is_symlink():
+            raise RedactionConfigError("allowlist: missing-config") from exc
+        return "0.0.0", frozenset()
+    except OSError as exc:
+        raise RedactionConfigError("allowlist: unreadable-config") from exc
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            raise RedactionConfigError("allowlist: unreadable-config")
+        with os.fdopen(fd, "r", encoding="utf-8") as fh:
+            fd = -1
+            payload = json.load(fh)
+    except RedactionConfigError:
+        raise
+    except (OSError, UnicodeError, json.JSONDecodeError, RecursionError) as exc:
+        raise RedactionConfigError("allowlist: invalid-json") from exc
+    finally:
+        if fd != -1:
+            os.close(fd)
+    if not isinstance(payload, dict) or payload.get("schema_version") != _ALLOWLIST_SCHEMA:
+        raise RedactionConfigError("allowlist: invalid-schema")
+    version = payload.get("version")
+    categories = payload.get("categories")
+    if not isinstance(version, str) or not version.strip() or not isinstance(categories, dict):
+        raise RedactionConfigError("allowlist: invalid-schema")
+    entries: set[str] = set()
+    for items in categories.values():
+        if not isinstance(items, list) or not all(isinstance(x, str) and x for x in items):
+            raise RedactionConfigError("allowlist: invalid-entries")
+        entries.update(items)
+    return version, frozenset(entries)
+
+
+def is_allowlisted_public_identifier(
+    token: str, *, allowlist: frozenset[str] | None = None
+) -> bool:
+    """Return True iff token matches an exact entry in the public technical allowlist."""
+    entries = allowlist if allowlist is not None else load_public_allowlist()[1]
+    return token in entries
+
+
+def _is_exempt_match(text: str, match: re.Match[str], allowlist: frozenset[str]) -> bool:
+    raw = match.group(0)
+    if raw in allowlist:
+        return True
+    # CLI long flags start with "--", which lies outside \b; accept "--<matched>" if allowlisted.
+    start = match.start()
+    if start >= 2 and text[start - 2 : start] == "--" and f"--{raw}" in allowlist:
+        return True
+    return False
 
 
 def _load_custom():
@@ -95,7 +186,7 @@ def _load_custom():
         if not s or s.startswith("#"):
             continue
         try:
-            pats.append(("custom", re.compile(s, re.IGNORECASE)))
+            pats.append(("custom", re.compile(s, re.IGNORECASE), False))
         except (re.error, OverflowError, RecursionError, MemoryError):
             errors.append((lineno, "invalid-regex"))
     return pats, errors
@@ -124,9 +215,13 @@ def _mask(s: str) -> str:
 
 def scan(text: str):
     """Return [(class, masked_snippet)]. Never returns raw secret text."""
+    patterns = active_patterns()
+    _, allowlist = load_public_allowlist()
     hits, seen = [], set()
-    for cls, rx in active_patterns():
+    for cls, rx, allowlist_exempt in patterns:
         for m in rx.finditer(text):
+            if allowlist_exempt and _is_exempt_match(text, m, allowlist):
+                continue
             raw = m.group(0)
             key = (cls, raw.lower())
             if key in seen:
@@ -136,11 +231,50 @@ def scan(text: str):
     return hits
 
 
+_CLASS_PRIORITY = {
+    "secret": 0,
+    "custom": 1,
+    "internal-ip": 2,
+    "internal-host": 2,
+    "internal-path": 2,
+    "pii": 3,
+}
+
+
 def redact(text: str) -> str:
-    out = text
-    for cls, rx in active_patterns():
-        out = rx.sub(f"[REDACTED:{cls}]", out)
-    return out
+    """Redact matched spans from original text so overlapping PII cannot split secrets."""
+    patterns = active_patterns()
+    _, allowlist = load_public_allowlist()
+    spans: list[tuple[int, int, str]] = []
+    for cls, rx, allowlist_exempt in patterns:
+        for m in rx.finditer(text):
+            if allowlist_exempt and _is_exempt_match(text, m, allowlist):
+                continue
+            if m.end() > m.start():
+                spans.append((m.start(), m.end(), cls))
+    if not spans:
+        return text
+    spans.sort(key=lambda item: (item[0], -item[1]))
+    merged: list[tuple[int, int, str]] = []
+    for start, end, cls in spans:
+        if not merged or start >= merged[-1][1]:
+            merged.append((start, end, cls))
+        else:
+            prev_start, prev_end, prev_cls = merged[-1]
+            best_cls = (
+                cls
+                if _CLASS_PRIORITY.get(cls, 4) < _CLASS_PRIORITY.get(prev_cls, 4)
+                else prev_cls
+            )
+            merged[-1] = (prev_start, max(prev_end, end), best_cls)
+    parts: list[str] = []
+    cursor = 0
+    for start, end, cls in merged:
+        parts.append(text[cursor:start])
+        parts.append(f"[REDACTED:{cls}]")
+        cursor = end
+    parts.append(text[cursor:])
+    return "".join(parts)
 
 
 def decision(text: str):
