@@ -120,6 +120,91 @@ class EditorialAllowlistDlpTest(unittest.TestCase):
                     finally:
                         mod.ALLOWLIST_PATH = orig
 
+    def test_overlapping_secret_and_pii_redacts_whole_secret(self):
+        for surface in ("gist", "x"):
+            with self.subTest(surface=surface), tempfile.TemporaryDirectory() as td:
+                rules = Path(td) / "rules.txt"
+                rules.write_text("", encoding="utf-8")
+                with patch.dict(os.environ, {"HOME": td, "X_DENYLIST_FILE": str(rules)}, clear=True):
+                    mod = _load_redactor(surface)
+                    for sample in (
+                        "Bearer AbCdEf555-234-5678GhIjKlMnOpQr",
+                        "sk-proj-2025550123AbCdEfGhIj",
+                    ):
+                        redacted = mod.redact(sample)
+                        self.assertEqual(redacted, "[REDACTED:secret]", sample)
+                        self.assertEqual(mod.decision(redacted), ("PUBLISH", []))
+
+    def test_dotted_compact_international_phone_and_unhyphenated_ssn_hard_block(self):
+        pii_samples = [
+            "Call the customer at 202.555.0123 today",
+            "Call +12025550123 now",
+            "Reach out at 202 555 0123",
+            "Direct line 2025550123",
+            "UK desk +44 20 7946 0958",
+            "Customer SSN 123456789 on file",
+            "Taxpayer 123 45 6789 verified",
+        ]
+        safe_numbers = [
+            "unix timestamp=1732419200 and build_id=123456789 and rfc=9110",
+            "ip 192.0.2.10 and ipv6 2001:db8::1",
+        ]
+        for surface in ("gist", "x"):
+            with self.subTest(surface=surface), tempfile.TemporaryDirectory() as td:
+                rules = Path(td) / "rules.txt"
+                rules.write_text("", encoding="utf-8")
+                with patch.dict(os.environ, {"HOME": td, "X_DENYLIST_FILE": str(rules)}, clear=True):
+                    mod = _load_redactor(surface)
+                    for sample in pii_samples:
+                        verdict, hits = mod.decision(sample)
+                        self.assertEqual(verdict, "ABSTAIN", f"{surface}: {sample}")
+                        self.assertTrue(any(cls == "pii" for cls, _ in hits), f"{surface}: {hits}")
+                        self.assertIn("[REDACTED:pii]", mod.redact(sample))
+                    for benign in safe_numbers:
+                        verdict, hits = mod.decision(benign)
+                        self.assertEqual(verdict, "PUBLISH", f"{surface}: {benign} -> {hits}")
+
+    def test_allowlist_rejects_symlink_fifo_and_deep_json_fail_closed(self):
+        for surface in ("gist", "x"):
+            with self.subTest(surface=surface), tempfile.TemporaryDirectory() as td:
+                rules = Path(td) / "rules.txt"
+                rules.write_text("", encoding="utf-8")
+                with patch.dict(os.environ, {"HOME": td, "X_DENYLIST_FILE": str(rules)}, clear=True):
+                    mod = _load_redactor(surface)
+                    orig = mod.ALLOWLIST_PATH
+                    try:
+                        target_json = Path(td) / "real.json"
+                        target_json.write_text(
+                            '{"schema_version":"public-technical-allowlist/v1","version":"1.0.0","categories":{"c":["x"]}}',
+                            encoding="utf-8",
+                        )
+                        sym = Path(td) / "link.json"
+                        sym.symlink_to(target_json)
+                        mod.ALLOWLIST_PATH = sym
+                        # Simulate platforms without os.O_NOFOLLOW (e.g. Windows)
+                        with patch.object(mod.os, "O_NOFOLLOW", 0, create=True):
+                            verdict, hits = mod.decision("git status")
+                            self.assertEqual(verdict, "ABSTAIN")
+                            self.assertEqual(hits[0][0], "redactor-config")
+
+                        if hasattr(os, "mkfifo"):
+                            fifo = Path(td) / "pipe.json"
+                            os.mkfifo(fifo)
+                            mod.ALLOWLIST_PATH = fifo
+                            verdict, hits = mod.decision("git status")
+                            self.assertEqual(verdict, "ABSTAIN")
+                            self.assertEqual(hits[0][0], "redactor-config")
+
+                        deep = Path(td) / "deep.json"
+                        depth = sys.getrecursionlimit() + 500
+                        deep.write_text("[" * depth + "0" + "]" * depth, encoding="utf-8")
+                        mod.ALLOWLIST_PATH = deep
+                        verdict, hits = mod.decision("git status")
+                        self.assertEqual(verdict, "ABSTAIN")
+                        self.assertEqual(hits[0][0], "redactor-config")
+                    finally:
+                        mod.ALLOWLIST_PATH = orig
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -75,7 +75,15 @@ _add("internal-path", r"/Users/[A-Za-z0-9._-]+/[A-Za-z0-9._/-]+")
 # Customer / personal PII. Never allowlisted.
 _add("pii", r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 _add("pii", r"\b\d{3}-\d{2}-\d{4}\b")
-_add("pii", r"(?<!\d)(?:\+1[-.\s])?(?:\(\d{3}\)\s*|\d{3}-)\d{3}-\d{4}(?!\d)")
+_add("pii", r"(?<!\d)\d{3}\s\d{2}\s\d{4}(?!\d)")
+_add("pii", r"\b(?:ssn|social\s+security(?:\s+(?:no|num|number))?)\s*(?:is|[:=#-])?\s*\d{9}\b")
+_add("pii", r"(?<!\d)(?:\+1[-.\s]?)?\(\d{3}\)[-.\s]?\d{3}[-.\s]?\d{4}(?!\d)")
+_add("pii", r"(?<!\d)(?:\+1[-.\s]?)?\d{3}[-.\s]\d{3}[-.\s]\d{4}(?!\d)")
+_add(
+    "pii",
+    r"(?<![A-Za-z0-9.])\+(?:1[-.\s]?(?:\(\d{3}\)[-.\s]?|\d{3}[-.\s]?)\d{3}[-.\s]?\d{4}|[1-9](?:[-.\s()]?\d){7,14})(?![A-Za-z0-9])",
+)
+_add("pii", r"(?<![A-Za-z0-9.])[2-9]\d{2}[2-9]\d{6}(?![A-Za-z0-9.])")
 # Secret-shaped tokens (high-entropy / known prefixes). Fail-closed.
 _add("secret", r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----")
 _add("secret", r"\b(?:Bearer|bearer)\s+[A-Za-z0-9._\-]{16,}\b")
@@ -97,9 +105,12 @@ def load_public_allowlist(path: Path | None = None) -> tuple[str, frozenset[str]
     symlink, an unreadable file, or malformed schema raises RedactionConfigError.
     """
     target = path if path is not None else ALLOWLIST_PATH
-    o_nofollow = getattr(os, "O_NOFOLLOW", 0)
+    if target.is_symlink():
+        raise RedactionConfigError("allowlist: symlink-rejected")
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    fd = -1
     try:
-        fd = os.open(target, os.O_RDONLY | o_nofollow)
+        fd = os.open(target, flags)
     except FileNotFoundError as exc:
         if path is not None or target.is_symlink():
             raise RedactionConfigError("allowlist: missing-config") from exc
@@ -115,7 +126,7 @@ def load_public_allowlist(path: Path | None = None) -> tuple[str, frozenset[str]
             payload = json.load(fh)
     except RedactionConfigError:
         raise
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeError, json.JSONDecodeError, RecursionError) as exc:
         raise RedactionConfigError("allowlist: invalid-json") from exc
     finally:
         if fd != -1:
@@ -220,21 +231,50 @@ def scan(text: str):
     return hits
 
 
+_CLASS_PRIORITY = {
+    "secret": 0,
+    "custom": 1,
+    "internal-ip": 2,
+    "internal-host": 2,
+    "internal-path": 2,
+    "pii": 3,
+}
+
+
 def redact(text: str) -> str:
+    """Redact matched spans from original text so overlapping PII cannot split secrets."""
     patterns = active_patterns()
     _, allowlist = load_public_allowlist()
-    out = text
+    spans: list[tuple[int, int, str]] = []
     for cls, rx, allowlist_exempt in patterns:
-        if allowlist_exempt:
-            out = rx.sub(
-                lambda m, _cls=cls, _src=out: (
-                    m.group(0) if _is_exempt_match(_src, m, allowlist) else f"[REDACTED:{_cls}]"
-                ),
-                out,
-            )
+        for m in rx.finditer(text):
+            if allowlist_exempt and _is_exempt_match(text, m, allowlist):
+                continue
+            if m.end() > m.start():
+                spans.append((m.start(), m.end(), cls))
+    if not spans:
+        return text
+    spans.sort(key=lambda item: (item[0], -item[1]))
+    merged: list[tuple[int, int, str]] = []
+    for start, end, cls in spans:
+        if not merged or start >= merged[-1][1]:
+            merged.append((start, end, cls))
         else:
-            out = rx.sub(f"[REDACTED:{cls}]", out)
-    return out
+            prev_start, prev_end, prev_cls = merged[-1]
+            best_cls = (
+                cls
+                if _CLASS_PRIORITY.get(cls, 4) < _CLASS_PRIORITY.get(prev_cls, 4)
+                else prev_cls
+            )
+            merged[-1] = (prev_start, max(prev_end, end), best_cls)
+    parts: list[str] = []
+    cursor = 0
+    for start, end, cls in merged:
+        parts.append(text[cursor:start])
+        parts.append(f"[REDACTED:{cls}]")
+        cursor = end
+    parts.append(text[cursor:])
+    return "".join(parts)
 
 
 def decision(text: str):
