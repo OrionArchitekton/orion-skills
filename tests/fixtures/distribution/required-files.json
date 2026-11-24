@@ -46,7 +46,8 @@
     "publish-core/selftest.py",
     "publish-core/x-denylist.sample.txt",
     "references/DERIVE-FROM-PUBLIC.md",
-    "references/REDACTOR-DENYLIST.md"
+    "references/REDACTOR-DENYLIST.md",
+    "references/public-technical-identifiers.v1.json"
   ],
   "goal-prompt": [
     "SKILL.md",
@@ -166,6 +167,7 @@
     "publish-core/x_client.py",
     "references/DOCTRINE.md",
     "references/HOOK-PATTERN.md",
-    "references/REDACTOR-DENYLIST.md"
+    "references/REDACTOR-DENYLIST.md",
+    "references/public-technical-identifiers.v1.json"
   ]
 }
