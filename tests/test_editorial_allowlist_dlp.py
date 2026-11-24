@@ -142,6 +142,7 @@ class EditorialAllowlistDlpTest(unittest.TestCase):
             "Reach out at 202 555 0123",
             "Direct line 2025550123",
             "UK desk +44 20 7946 0958",
+            "UK London +44 (20) 7946 0958",
             "Customer SSN 123456789 on file",
             "Taxpayer 123 45 6789 verified",
         ]
