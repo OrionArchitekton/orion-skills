@@ -5,9 +5,9 @@
 Map W3C DTCG tokens (`tokens/brand.tokens.json`) to CSS custom properties so shared registry components inherit host polarity automatically:
 
 - `--orion-bg` / `--orion-surface` / `--orion-surface-elevated` (OKLCH tonal steps)
-- `--orion-ink` / `--orion-ink-muted` (must verify `>= 4.5:1` on every surface)
-- `--orion-accent` / `--orion-accent-ink` (CTA fills + ink verified `>= 4.5:1` in default, hover, and focus-visible states)
-- `--orion-ring` (high-contrast `:focus-visible` outline `>= 3.0:1`)
+- `--orion-fg` / `--orion-fg-muted` (must verify `>= 4.5:1` on every surface)
+- `--orion-accent` / `--orion-accent-fg` / `--orion-accent-hover` (CTA fills + ink verified `>= 4.5:1` in default, hover, and focus-visible states)
+- `--orion-border` / `--orion-radius-*` / `--orion-font-{display,sans,mono}` (plus `.orion-focus-ring` for high-contrast `:focus-visible` outlines `>= 3.0:1`)
 
 ## Primary CTA Hit Targets
 

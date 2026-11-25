@@ -33,7 +33,7 @@ Read `<bundle>/manifest.json` first, then inspect every artifact directly (mark 
 
 ## Output Contract (under 450 words)
 
-- Line 1: `VERDICT: READY` (only when zero `BLOCKING` findings) or `VERDICT: FIX FIRST`
+- Line 1: `VERDICT: FIX FIRST` whenever any required evidence (including `qa_report.json`, links/forms/detector reports when required, or any required viewport/phone/fold/tile screenshot) is missing, unreadable, or uninspected, OR when any `BLOCKING` finding exists; `VERDICT: READY` only after all required evidence has been inspected and zero `BLOCKING` findings remain.
 - `BUNDLE:` site/repo, commit short, screenshot/tile counts opened, QA + detector + link + form statuses
 - `REFERENCE:` opened status and closest match or drift clause
 - `FINDINGS:` `SEVERITY | <route>@<width> or <key> | what is wrong | smallest fix`
