@@ -9,7 +9,7 @@ Executes Stage 4 (Implementation) and Stage 7 (Targeted Iteration) of the 9-stag
 
 ## Build Contract
 
-1. **Preflight:** Confirm `orion-check-canonical-web-home` passed (`0`) and read `DESIGN.md` plus `tokens/brand.tokens.json`.
+1. **Preflight:** Confirm the canonical-home preflight passed (`orion-check-canonical-web-home` exit `0` when installed, or portable `git rev-parse --show-toplevel` + `git worktree list` check) and read `DESIGN.md` plus `tokens/brand.tokens.json`.
 2. **Accessible Primitives (`@orion/registry`):** Consume `@orion/registry` Base UI and React Aria components styled strictly through consumer CSS tokens (`--bg`, `--surface`, `--text`, `--accent`). Never re-implement accessible dialogs, tabs, popovers, or menus from scratch.
 3. **Semantic Landmarks & Headings:** Render exactly one `<header>`, `<nav>`, `<main>`, and `<footer>` at page shell level (never inside repeated cards). Keep one visible `<h1>` per page above the `900px` desktop fold with strictly sequential `h1 -> h2 -> h3` heading levels.
 4. **Hit Targets & Contrast:** Size every primary CTA and interactive control at `>= 44px` height/tap target (`min-h-[44px] min-w-[44px]`). Verify default, hover, focus-visible, and disabled states against `colorjs.io` (`>= 4.5:1` normal text, `>= 3.0:1` large text).
