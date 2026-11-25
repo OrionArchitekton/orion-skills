@@ -145,7 +145,7 @@ validated as a Codex set.
 
 ## Skills
 
-The released catalog contains 29 skills. `reassert-guards-on-rewrite` and
+The released catalog contains 32 skills. `reassert-guards-on-rewrite` and
 `apply-review-findings` were added in v0.7.0; v0.7.1 adds optional plugin loading.
 
 | Skill | What it does | Invoke when |
@@ -177,6 +177,9 @@ The released catalog contains 29 skills. `reassert-guards-on-rewrite` and
 | [`document-release`](skills/document-release/SKILL.md) | Reviews release docs against the feature branch after code commits, polishes CHANGELOG voice without rewriting history, and asks before bumping VERSION. | On the feature branch after code commits and before PR merge. |
 | [`office-hours`](skills/office-hours/SKILL.md) | Product-ideation partner: startup mode pushes six forcing questions until "everyone wants this" becomes a named customer with real demand evidence; builder mode is an enthusiastic riff partner for side projects. Both modes end in a reviewed design doc and one concrete next action, never in code. | You have an idea you haven't validated yet, or you're asked "is this worth building". |
 | [`design-consultation`](skills/design-consultation/SKILL.md) | Proposes a complete, coherent design system (aesthetic, typography, color, layout, spacing, motion) as one package, not a menu, with an explicit safe-choices-vs-risks breakdown, then generates a working HTML preview page and writes DESIGN.md as the project's source of truth. | Starting a new project's UI with no DESIGN.md yet, or asked for "design system" / "brand guidelines". |
+| [`orion-web-director`](skills/orion-web-director/SKILL.md) | Directs stages 1-3 and 9 of the 9-stage studio web lifecycle: canonical home preflight, asymmetric layout archetype, typography pairing, OKLCH tonal elevation, CRO fold rules, and SPDX license gates before implementation. | Starting or restyling a website or web app before writing frontend code. |
+| [`orion-frontend-builder`](skills/orion-frontend-builder/SKILL.md) | Implements directed web specs using `@orion/registry` primitives, semantic landmarks, `>=44px` CTA hit targets, self-hosted `@fontsource-variable/*` fonts, `orion-media` assets, and `prefers-reduced-motion` guards. | Building or iterating frontend components and pages from a locked `DESIGN.md` and token contract. |
+| [`web-render-reviewer`](skills/web-render-reviewer/SKILL.md) | Fresh-context Stage-6 critique of `orion-web-capture` bundles (`375`/`768`/`1280` fold and full PNGs, Axe, `html-validate`, `colorjs.io`, links, forms, and detector) returning severity-graded findings. | Reviewing a captured frontend bundle before shipping or merging a web PR. |
 | [`delegate`](skills/delegate/SKILL.md) | Hands a scoped subagent, bulk, or background task to a non-Anthropic model CLI (Codex on a ChatGPT plan, Grok on a metered xAI key, or a free local model via Ollama) so it runs off the Anthropic budget with that vendor's native tool calling, behind a sandbox and env-scrub gate. Shells out to each vendor's own CLI; it is not an `ANTHROPIC_BASE_URL` router-proxy (a proxy corrupts tool calls). | You want subagent/workflow fan-out to run on another model off your Anthropic allocation, without the router-proxy tool-calling trap. |
 | [`grokbot`](skills/grokbot/SKILL.md) | Hands a task to a bot in xAI's Grok Bot desktop app through the documented routine webhook, and gets the result back through an outbox file the bot writes with the app's local execution, so no UI is touched. Also reads any bot's chat from the app's local cache. Never resends a task that might already be running (it reports the outcome as unknown instead), refuses webhook redirects, rejects path-like request ids, and spells out the webhook-key plus local-execution trade-off. | Work needs an always-on bot with its own logged-in browser, a schedule, or your connected apps, and you want the result back in your coding session. |
 
@@ -301,6 +304,18 @@ The released catalog contains 29 skills. `reassert-guards-on-rewrite` and
   The skill proposes a full system in one pass, tells you which choices are safe category
   defaults and which are deliberate risks, generates an HTML preview you can open in a
   browser, and only then writes DESIGN.md.
+- **`orion-web-director`**: Before restyling a marketing site or dashboard, it verifies the
+  canonical checkout with `orion-check-canonical-web-home`, selects one of 8 asymmetric
+  archetypes, locks OKLCH tonal tokens and CRO fold rules in `DESIGN.md`, and gates every
+  dependency against the SPDX commercial allowlist.
+- **`orion-frontend-builder`**: Implementing a landing page from `DESIGN.md`: it composes
+  `@orion/registry` primitives styled via consumer CSS tokens, sets `>=44px` primary CTA
+  targets, bundles `@fontsource-variable/*` locally, prepares assets via `orion-media`, and
+  adds `@media (prefers-reduced-motion: reduce)` before handing off to `orion-web-capture`.
+- **`web-render-reviewer`**: Given a capture bundle from `orion-web-capture`, it opens the
+  `375`, `768`, and `1280` fold/full PNGs, phone tiles, `qa_report.json`, and `detector/report.json`
+  in a fresh read-only context and emits `VERDICT: READY` or `VERDICT: FIX FIRST` with the
+  smallest targeted fix per finding.
 - **`delegate`**: "Run this bulk summarize off-budget." `should_delegate` flags it bulk plus
   cheap-ok, so it routes to a free local model via Ollama; a frontier-coding task routes to
   Codex on the ChatGPT plan, an X-search task to Grok on a metered key. Each spawns that

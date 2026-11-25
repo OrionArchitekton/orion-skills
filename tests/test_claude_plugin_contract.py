@@ -30,7 +30,7 @@ class ClaudePluginContractTest(unittest.TestCase):
         for automatic in ('hooks/hooks.json', '.mcp.json', '.lsp.json', 'settings.json'):
             self.assertFalse((ROOT / automatic).exists(), automatic)
         paths = list((ROOT / 'skills').glob('*/SKILL.md'))
-        self.assertEqual(len(paths), 29)
+        self.assertEqual(len(paths), 32)
         self.assertFalse(any(p.is_symlink() for p in (ROOT / 'skills').rglob('*')))
 
     def test_documented_plugin_paths_survive_relocation_and_spaces(self):
