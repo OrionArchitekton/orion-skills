@@ -77,6 +77,14 @@
   "learn-capture": [
     "SKILL.md"
   ],
+  "orion-frontend-builder": [
+    "SKILL.md",
+    "references/primitives-and-assets.md"
+  ],
+  "orion-web-director": [
+    "SKILL.md",
+    "references/archetypes-and-tokens.md"
+  ],
   "office-hours": [
     "LICENSE.gstack",
     "LICENSE.orion",
@@ -156,6 +164,9 @@
   "triage-fanout-verdicts": [
     "SKILL.md",
     "scripts/triage_verdicts.py"
+  ],
+  "web-render-reviewer": [
+    "SKILL.md"
   ],
   "x": [
     "SKILL.md",
