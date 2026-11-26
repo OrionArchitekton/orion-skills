@@ -1,11 +1,14 @@
 {
   "name": "orion-skills",
-  "version": "0.7.1",
-  "description": "Optional workflow and verification skills for human-directed coding agents.",
+  "displayName": "Orion Skills",
+  "version": "0.8.0",
+  "description": "Workflow and verification skills for coding agents: preflight a branch before a PR, refuse to call work done until runtime is verified, prove a deploy is live, and keep edits inside a declared scope.",
   "author": {
-    "name": "Dan Mercede"
+    "name": "Dan Mercede",
+    "url": "https://www.danmercede.com"
   },
   "homepage": "https://github.com/OrionArchitekton/orion-skills",
   "repository": "https://github.com/OrionArchitekton/orion-skills",
-  "license": "MIT"
+  "license": "MIT",
+  "icon": "./.claude-plugin/icon.png"
 }

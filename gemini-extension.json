@@ -1,0 +1,5 @@
+{
+  "name": "orion-skills",
+  "version": "0.8.0",
+  "description": "Workflow and verification skills for coding agents: preflight a branch before a PR, refuse to call work done until runtime is verified, prove a deploy is live, and keep edits inside a declared scope."
+}
