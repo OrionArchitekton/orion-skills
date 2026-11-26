@@ -398,8 +398,9 @@ The catalog contains 32 skills. `reassert-guards-on-rewrite` and
 - Workflow skills that open PRs or push (`ship`, `oss-loop`, `document-release`) use
   the user's own `git` / `gh` and the host agent's approvals. Research-style skills
   (`office-hours`, `investigate`, `design-consultation`, `orion-deep-research`) use
-  the host agent's web search or fetch tools when available; `investigate` strips
-  hostnames, paths and identifiers from an error before searching.
+  the host agent's web search or fetch tools when available; `investigate`
+  instructs the agent to strip hostnames, paths and identifiers from an error before
+  searching.
 - Third-party services (X, GitHub, OpenAI, xAI, Grok Bot, any search provider)
   retain data under their own terms. This project keeps no copy.
 - Support: [GitHub Issues](https://github.com/OrionArchitekton/orion-skills/issues).
