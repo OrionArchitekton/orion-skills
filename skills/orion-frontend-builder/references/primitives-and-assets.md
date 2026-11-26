@@ -24,6 +24,7 @@ Map W3C DTCG tokens (`tokens/brand.tokens.json`) to CSS custom properties so sha
 
 Every frontend PR should include fast deterministic unit checks before running `orion-web-capture`:
 
-1. `colorjs.io` token contrast test asserting `>= 4.5:1` normal / `>= 3.0:1` large across all brand surface pairs.
-2. Zero long-dash test scanning built HTML, `<title>`, copy constants, and JSON-LD for `[\u2013\u2014\u2015]`.
-3. `schema-dts` / JSON-LD validation and `@media (prefers-reduced-motion: reduce)` presence check.
+1. `tsc --noEmit` passes cleanly after component/module edits, with React 19 Compiler code omitting manual `useMemo`/`useCallback` micro-optimizations.
+2. `colorjs.io` token contrast test asserting `>= 4.5:1` normal / `>= 3.0:1` large across all brand surface pairs.
+3. Zero long-dash test scanning built HTML, `<title>`, copy constants, and JSON-LD for `[\u2013\u2014\u2015]`.
+4. `schema-dts` / JSON-LD validation and `@media (prefers-reduced-motion: reduce)` presence check.

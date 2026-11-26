@@ -25,7 +25,7 @@ Read `<bundle>/manifest.json` first, then inspect every artifact directly (mark 
   - Phone-width (`375`) clipping, overlapping controls, or illegible text visible in PNG tiles.
   - Incomplete bundle (`manifest.bundle_problems` non-empty) or missing required QA/detector run when required.
 - **WARNING:**
-  - Any of the 5 multi-source AI-design tells (purple/violet gradients, Inter/default sans everywhere, rows of 3 identical cards, tracked-caps eyebrow labels above headings, single accented word in headline).
+  - Any of the multi-source AI-design tells (purple/violet gradients, Inter/default sans everywhere, rows of 3 identical cards, tracked-caps eyebrow labels above headings, single accented word in headline, unbriefed `#F4F1EA` cream + `#D97757` terracotta chrome, or fake `01 / 02 / 03` markers on non-sequential content).
   - Reference drift (palette hex, typography, or layout archetype contradicting `DESIGN.md` / `reference.path`).
   - Tablet (`768`) degradation, primary CTA below `1280x900` fold, `html-validate` errors, or missing `@media (prefers-reduced-motion)` rule.
 - **INFO:**

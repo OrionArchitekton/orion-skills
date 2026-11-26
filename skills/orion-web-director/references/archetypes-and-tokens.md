@@ -35,3 +35,12 @@ Pick one deliberate composition instead of centered stacks or generic 3-card row
 
 - Prefer CSS Scroll-Driven animations (`animation-timeline: view()`), native View Transitions (`@view-transition`), and damped spring curves (`stiffness: 260, damping: 28` via MIT `motion`) for interactive panels only.
 - Every stylesheet with animation or transition MUST include `@media (prefers-reduced-motion: reduce)` resetting durations and transforms safely.
+
+## AI-Slop Calibration and UX Microcopy
+
+Reject default AI clusters unless the brief explicitly requests them:
+
+- **Default palette and chrome tells:** Reject unbriefed `#F4F1EA` warm-cream backgrounds paired with `#D97757` / `#C45C26` terracotta accents, middle-dot metadata chains (`A · B · C`), tracked uppercase eyebrow tags (`WORD - fragment`), and appending trailing arrows (`->`) to every link or CTA.
+- **True-sequence numbering:** Reserve numeric step markers (`01 / 02 / 03`) strictly for chronological steps or ordered pipelines; keep unordered feature and problem blocks unnumbered.
+- **Unified `<h1>` voice:** Style `<h1>` as one cohesive typographic statement rather than italicizing or recoloring a single emphasis word inside the headline.
+- **Verb-consistent microcopy:** Match button and toast verbs end-to-end (`Publish` produces `Published`), choose specific verbs (`Save changes` over `Submit`), and keep empty/error states direct, actionable, and non-apologetic.
