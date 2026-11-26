@@ -387,9 +387,12 @@ The catalog contains 32 skills. `reassert-guards-on-rewrite` and
   user's machine: publish cap ledgers and logs (`x`, `gist`), the `readonly` session
   marker, and handoff / context-pack notes (`pre-compact`).
 - A skill runs when the user invokes it or when the host agent selects it for a
-  matching task. Only `readonly`, `gist` and `ship` are operator-invoked only
-  (`disable-model-invocation: true`); the others, including `x`, `delegate` and
-  `grokbot`, can be selected by the agent. Sends to a third party happen only when
+  matching task. On hosts that honor `disable-model-invocation: true` (Claude Code,
+  Codex), `readonly`, `gist` and `ship` are operator-invoked only; the others,
+  including `x`, `delegate` and `grokbot`, can be selected by the agent. Gemini CLI
+  0.70.0 does not read that field, so its model can activate any of the 32 skills,
+  including `gist` and `ship`: the default approval mode asks the operator to
+  confirm each activation, while auto-approval modes do not. Sends to a third party happen only when
   such a skill runs and the user has configured it with their own credentials:
   - `x`: posts text to the X API (`POST https://api.x.com/2/tweets`, OAuth 1.0a
     user context). Ships disarmed: nothing is sent until the user creates the arm
@@ -408,7 +411,7 @@ The catalog contains 32 skills. `reassert-guards-on-rewrite` and
     webhook (`GROKBOT_WEBHOOK_URL` / `GROKBOT_WEBHOOK_KEY`). `grokbot-read` only reads
     the desktop app's local chat cache.
 - Other network use goes through the user's own tools and the host agent's
-  approvals, and only to services the user already uses:
+  approvals:
   - Git remote and GitHub (`git fetch` / `git push`, `gh pr` / `gh repo` /
     `gh auth status`, the user's login): `reprobe-stale-premise` (fetches origin and
     queries PR state), `document-release` (detects the platform and base branch,
@@ -417,7 +420,9 @@ The catalog contains 32 skills. `reassert-guards-on-rewrite` and
     (its recon runs `gh auth status` among other CLI probes).
   - The user's own services: `prove-deploy-is-live` sends HTTP requests to the
     deployment being verified.
-  - Web search and fetch through the host agent's tools, when available:
+  - Web search and fetch through the host agent's tools, when available. These can
+    reach third-party sites the user has never visited (and expose the user's IP
+    address to them, depending on the host's fetch path):
     `orion-deep-research` (searches and fetches sources), `office-hours`,
     `design-consultation` (also browser screenshots when a browser tool exists) and
     `investigate`. `investigate` can search automatically for an unfamiliar error
