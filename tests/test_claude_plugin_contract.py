@@ -5,6 +5,7 @@ import re
 import shutil
 import struct
 import subprocess
+import zlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -44,10 +45,31 @@ class ClaudePluginContractTest(unittest.TestCase):
         data = icon.read_bytes()
         self.assertLess(len(data), 2 * 1024 * 1024)
         self.assertEqual(data[:8], b'\x89PNG\r\n\x1a\n')
-        self.assertEqual(data[12:16], b'IHDR')
-        width, height = struct.unpack('>II', data[16:24])
+        # Walk every chunk: CRCs must match, IHDR first, IEND last with no
+        # trailing bytes, and the IDAT stream must inflate to the exact size
+        # implied by IHDR (stdlib only; no image library dependency).
+        chunks, offset = [], 8
+        while offset < len(data):
+            self.assertLessEqual(offset + 12, len(data), 'truncated chunk')
+            length, kind = struct.unpack('>I4s', data[offset:offset + 8])
+            body = data[offset + 8:offset + 8 + length]
+            self.assertEqual(len(body), length, 'truncated chunk body')
+            crc, = struct.unpack('>I', data[offset + 8 + length:offset + 12 + length])
+            self.assertEqual(zlib.crc32(kind + body) & 0xffffffff, crc, kind)
+            chunks.append((kind, body))
+            offset += 12 + length
+        self.assertEqual(chunks[0][0], b'IHDR')
+        self.assertEqual(chunks[-1], (b'IEND', b''))
+        width, height, depth, color, _, _, interlace = struct.unpack(
+            '>IIBBBBB', chunks[0][1])
         self.assertEqual(width, height)
         self.assertTrue(512 <= width <= 2048, width)
+        channels = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[color]
+        self.assertEqual(interlace, 0)
+        raw = zlib.decompress(b''.join(b for k, b in chunks if k == b'IDAT'))
+        row = (width * channels * depth + 7) // 8
+        self.assertEqual(len(raw), height * (row + 1))
+        self.assertTrue(all(raw[y * (row + 1)] <= 4 for y in range(height)))
 
     def test_gemini_extension_is_skills_only_and_version_aligned(self):
         manifest = json.loads((ROOT / '.claude-plugin/plugin.json').read_text())
