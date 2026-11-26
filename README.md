@@ -76,9 +76,15 @@ gemini extensions install https://github.com/OrionArchitekton/orion-skills
 gemini skills list   # the 32 skills appear under the orion-skills extension
 ```
 
-Skills that name Claude Code tools (Workflow, `${CLAUDE_PLUGIN_ROOT}` helper paths)
-keep those prerequisites under Gemini CLI; discovery is not qualification of
-every workflow on that host.
+**Compatibility:** under Gemini CLI only skill discovery is verified (Gemini CLI
+0.70.0 lists all 32); no workflow is qualified on that host. Claude Code is the
+target for the full library and Codex for the three skills below. Several skills
+depend on Claude Code features and will not work as written under Gemini CLI:
+`orion-deep-research` and `author-workflow-fanout` (Claude Code Workflow tool),
+`readonly` and `scope-guard` (Claude Code PreToolUse hooks and tool names), and
+`x`, `gist`, `grokbot` and `readonly` helper paths written for direct installs or
+`${CLAUDE_PLUGIN_ROOT}`. Treat the rest as prose procedures that use whatever
+tools and approvals the Gemini host provides.
 
 ### skills CLI
 
@@ -376,33 +382,49 @@ The catalog contains 32 skills. `reassert-guards-on-rewrite` and
 
 - The plugin itself collects and stores no personal data, and loading it (as a
   Claude Code plugin, Gemini CLI extension or direct skill copy) sends nothing
-  anywhere. There is no telemetry.
+  anywhere. There is no telemetry and no MCP server.
 - Skills operate on the user's local repository files. Some write local state on the
   user's machine: publish cap ledgers and logs (`x`, `gist`), the `readonly` session
   marker, and handoff / context-pack notes (`pre-compact`).
-- Only on explicit invocation, and only with the user's own credentials and setup,
-  do these skills send data to a third party:
-  - `x`: posts the approved text to the X API (`POST https://api.x.com/2/tweets`,
-    OAuth 1.0a user context). Ships disarmed: no send happens until the user
-    creates the arm flag.
+- A skill runs when the user invokes it or when the host agent selects it for a
+  matching task. Only `readonly`, `gist` and `ship` are operator-invoked only
+  (`disable-model-invocation: true`); the others, including `x`, `delegate` and
+  `grokbot`, can be selected by the agent. Sends to a third party happen only when
+  such a skill runs and the user has configured it with their own credentials:
+  - `x`: posts text to the X API (`POST https://api.x.com/2/tweets`, OAuth 1.0a
+    user context). Ships disarmed: nothing is sent until the user creates the arm
+    flag. Once armed, the supported autonomous mode (an agent loop, optionally
+    nudged by the Stop-hook pattern in `skills/x/references/HOOK-PATTERN.md`) can
+    publish without a separate request or approval for each post, limited by the
+    redactor and a daily cap (default 5, `X_DAILY_CAP`).
   - `gist`: fetches an already-public file from `raw.githubusercontent.com` and
     creates a public gist through the GitHub CLI (`gh gist create`, the user's `gh`
     login). Operator-invoked only, and ships disarmed behind two arm flags.
-  - `delegate`: hands a scoped task to another vendor's own CLI: OpenAI Codex (the
-    user's ChatGPT login), xAI's `grok` CLI (the user's `XAI_API_KEY`), or Ollama at
-    `OLLAMA_HOST` (default `http://localhost:11434`; a remote host only if the user
-    sets one).
+  - `delegate`: sends the task text to another vendor's own CLI or endpoint: OpenAI
+    Codex (the user's ChatGPT login), xAI's `grok` CLI (the user's `XAI_API_KEY`), or
+    Ollama's `/api/generate` at `OLLAMA_HOST` (default `http://localhost:11434`; a
+    remote host only if the user sets one).
   - `grokbot`: `grokbot-send` posts the task to the user's own Grok Bot routine
     webhook (`GROKBOT_WEBHOOK_URL` / `GROKBOT_WEBHOOK_KEY`). `grokbot-read` only reads
     the desktop app's local chat cache.
-- Workflow skills that open PRs or push (`ship`, `oss-loop`, `document-release`) use
-  the user's own `git` / `gh` and the host agent's approvals. Research-style skills
-  (`office-hours`, `investigate`, `design-consultation`, `orion-deep-research`) use
-  the host agent's web search or fetch tools when available; `investigate`
-  instructs the agent to strip hostnames, paths and identifiers from an error before
-  searching.
-- Third-party services (X, GitHub, OpenAI, xAI, Grok Bot, any search provider)
-  retain data under their own terms. This project keeps no copy.
+- Other network use goes through the user's own tools and the host agent's
+  approvals, and only to services the user already uses:
+  - Git remote and GitHub (`git fetch` / `git push`, `gh pr` / `gh repo` /
+    `gh auth status`, the user's login): `reprobe-stale-premise` (fetches origin and
+    queries PR state), `document-release` (detects the platform and base branch,
+    pushes), `ship` and `oss-loop` (open PRs), `pre-pr` and `ship`
+    (`git remote show origin` queries the remote's default branch), `tools-router`
+    (its recon runs `gh auth status` among other CLI probes).
+  - The user's own services: `prove-deploy-is-live` sends HTTP requests to the
+    deployment being verified.
+  - Web search and fetch through the host agent's tools, when available:
+    `orion-deep-research` (searches and fetches sources), `office-hours`,
+    `design-consultation` (also browser screenshots when a browser tool exists) and
+    `investigate`. `investigate` can search automatically for an unfamiliar error
+    after it instructs the agent to strip hostnames, paths and identifiers; there is
+    no separate consent prompt beyond the host's own tool approvals.
+- Third-party services (X, GitHub, OpenAI, xAI, Ollama hosts, Grok Bot, any search
+  provider) retain data under their own terms. This project keeps no copy.
 - Support: [GitHub Issues](https://github.com/OrionArchitekton/orion-skills/issues).
   Contact: dan@danmercede.com.
 
