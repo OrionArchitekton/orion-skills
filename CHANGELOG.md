@@ -4,14 +4,35 @@ All notable changes to the orion-skills library. This project follows Semantic
 Versioning (https://semver.org): adding a skill is a MINOR bump, a non-breaking change to
 an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
 
-## Unreleased — compatibility decision pending
+## [0.8.0] - Unreleased (prepared 2026-11-26, not tagged)
+
+Adds three skills (MINOR under the new-skill policy) plus directory-listing
+metadata. The catalog now contains 32 skills.
+
+### Added
+
+- `orion-web-director`, `orion-frontend-builder` and `web-render-reviewer`: the
+  9-stage web design triad (PR #37).
+- Public technical identifier allowlist for the shared publish redactor (PR #36).
+- Claude plugin listing metadata: `displayName` "Orion Skills", `author.url`, a
+  rewritten description and a directory listing icon at `.claude-plugin/icon.png`
+  (1024x1024 PNG).
+- `gemini-extension.json`: the repository root is a skills-only Gemini CLI
+  extension; Gemini CLI discovers `skills/*/SKILL.md`. No MCP servers.
+- README "Examples" and "Data, network and privacy" sections.
+
+### Changed
+
+- Plugin runbook and README skill counts now read 32 (29 at v0.7.1).
+
+### Compatibility (decision still open)
 
 - Delegate rejects relative and workspace-controlled CLI selections before launch,
   checks intermediate symlinks and rechecks the selected launcher before spawning.
   Outside custom, user, system and manager-shim layouts retain launcher identity.
 - This intentionally breaks workspace-local/relative installs previously accepted.
-  Recommend a MAJOR release if adopted; no version/tag or plugin manifest bump is
-  made here. See `docs/runbooks/delegate-executable-selection.md` for the fixture
+  PR #35 recommended a MAJOR release if adopted. This entry is prepared as 0.8.0
+  as directed on 2026-11-26; confirm MINOR versus 1.0.0 before tagging. See `docs/runbooks/delegate-executable-selection.md` for the fixture
   compatibility matrix, migration and unqualified native-platform boundaries.
 
 ## [0.7.1] - 2026-11-02
