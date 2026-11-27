@@ -1,5 +1,5 @@
 ---
-verified: 2026-11-02
+verified: 2026-11-26
 review_after: 2026-12-02
 topics: [delegate, executable-selection, compatibility]
 references:
@@ -82,9 +82,8 @@ credentials, hooks, plugin caches or global installs to make tests pass.
 Previously, any `shutil.which` result was converted to an absolute path. That
 accepted workspace-local CLIs and relative PATH hits. This candidate intentionally
 rejects those cases, even if the operator installed them deliberately. Under this
-library's SemVer rule it is a **MAJOR** change: recommend 1.0.0 if this default is
-approved, rather than publishing it as 0.7.2. No version/tag is reserved and the
-plugin manifest remains at the released version. Native platform qualification
+library's SemVer rule it is a **MAJOR** change, so it ships in 1.0.0 (approved
+2026-11-26) rather than as 0.7.x. Native platform qualification
 remains a separate prerequisite for any expanded support claim.
 
 For an affected intentional install, first inspect a dry-run from the intended
@@ -92,8 +91,8 @@ workspace and choose an existing external CLI with an absolute PATH entry. If
 none exists, the operator must separately authorize installation outside the
 workspace. Merely putting an outside symlink in PATH does not migrate a target
 that still lives inside the workspace. There is no automatic trust override or
-silent fallback. Keep the released source until the compatibility decision is
-approved; do not change Codex qualification pins or research/Workflow prerequisites.
+silent fallback. Operators who cannot migrate yet can stay on v0.7.1; do not
+change Codex qualification pins or research/Workflow prerequisites.
 
 ## Limits, rollout and rollback
 
