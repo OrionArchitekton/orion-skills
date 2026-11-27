@@ -139,8 +139,15 @@ class CodexVerificationSkillsContractTest(unittest.TestCase):
             path.relative_to(ROOT) for path in ROOT.rglob("marketplace.json")
         )
         # The optional Claude package is independent of direct Codex installs.
+        # claude-plugin/ is the Markdown-only Claude directory submission.
         # Reject every other plugin manifest, including any Codex plugin.
-        self.assertEqual(plugin_manifests, [Path(".claude-plugin/plugin.json")])
+        self.assertEqual(
+            plugin_manifests,
+            [
+                Path(".claude-plugin/plugin.json"),
+                Path("claude-plugin/.claude-plugin/plugin.json"),
+            ],
+        )
         self.assertEqual(marketplace_manifests, [])
 
     def test_readme_binds_exact_codex_install_and_support_claims(self):
