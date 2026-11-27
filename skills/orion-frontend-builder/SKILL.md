@@ -15,7 +15,7 @@ Executes Stage 4 (Implementation) and Stage 7 (Targeted Iteration) of the 9-stag
 4. **Hit Targets & Contrast:** Size every primary CTA and interactive control at `>= 44px` height/tap target (`min-h-[44px] min-w-[44px]`). Verify default, hover, focus-visible, and disabled states against `colorjs.io` (`>= 4.5:1` normal text, `>= 3.0:1` large text).
 5. **Self-Hosted Typography:** Install `@fontsource-variable/*` packages (or `pyftsubset` WOFF2 bundles in `public/fonts/`) instead of runtime external font CDNs.
 6. **Media Pipeline (`orion-media`):** Prepare raster/SVG assets with `orion-media` (`sharp`, `SVGO`, `vtracer`) with explicit `width`, `height`, `alt`, and SPDX-verified asset vault provenance. Use click-to-play facades instead of auto-loaded hero video payloads (`initial page transfer <= 600 KB`).
-7. **Reduced Motion & Freeze Safety:** Include `@media (prefers-reduced-motion: reduce)` in global CSS disabling continuous animations and transitions. Never use `U+2013`, `U+2014`, or `U+2015` dashes in JSX, copy, `<title>`, or JSON-LD.
+7. **Reduced Motion, Compiler & Freeze Safety:** Under React 19 Compiler, omit manual `useMemo`/`useCallback` micro-optimizations unless profiling proves an escape hatch is required, and run `tsc --noEmit` after component edits before capture. Include `@media (prefers-reduced-motion: reduce)` in global CSS disabling continuous animations and transitions. Never use `U+2013`, `U+2014`, or `U+2015` dashes in JSX, copy, `<title>`, or JSON-LD.
 
 ## Hand-Off to Render & Validate
 
