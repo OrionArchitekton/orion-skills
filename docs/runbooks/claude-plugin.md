@@ -1,6 +1,6 @@
 ---
-verified: 2026-11-02
-review_after: 2027-02-02
+verified: 2026-11-26
+review_after: 2027-02-26
 topics: [orion-skills, claude-code, plugin, loading, rollback]
 references:
   - .claude-plugin/plugin.json
@@ -15,7 +15,8 @@ references:
 # Optional Claude Code plugin
 
 The plugin is session-local installation convenience for this repository's existing
-29 skill definitions. Tested CLI: **Claude Code 2.1.316, Linux/POSIX**. Published
+32 skill definitions (29 in published v0.7.1). Tested CLI: **Claude Code 2.1.316, Linux/POSIX**;
+the 0.8.0 manifest also validates strict with no directory findings on 2.1.332. Published
 collection/plugin version: [**0.7.1**](https://github.com/OrionArchitekton/orion-skills/releases/tag/v0.7.1).
 The published v0.7.0 has no plugin manifest and remains unchanged. A plugin namespace
 is not a grant to publish, delegate, install hooks or change settings.
@@ -57,7 +58,7 @@ Offline inspection on the tested CLI needs no prompt, login or model call:
 claude --plugin-dir "/absolute/path/to/orion skills" plugin details orion-skills
 ```
 
-Expected inventory: **29 skills, 0 agents, 0 hooks, 0 MCP servers, 0 LSP servers**.
+Expected inventory: **32 skills (29 at v0.7.1), 0 agents, 0 hooks, 0 MCP servers, 0 LSP servers**.
 This lists component IDs; it does not execute their procedures or verify their
 external prerequisites. During an authorized interactive session use
 `/orion-skills:pre-pr` or `/orion-skills:ship`. All bundled IDs use that prefix.
@@ -68,9 +69,10 @@ names to infer which source ran. Built-in commands such as `/compact` stay built
 The existing operator-only flags for `readonly`, `gist` and `ship` are retained.
 No additional allowed-tools or default permission rules are supplied.
 
-The native validator may suggest a marketplace install line and report a missing
-listing icon as a directory-profile finding. Those are listing advice, outside
-this loading route; no marketplace is owned or provided by this repository.
+The native validator may suggest a marketplace install line. That is listing advice,
+outside this loading route; no marketplace is owned or provided by this repository.
+The manifest carries `displayName` and a directory listing `icon`
+(`.claude-plugin/icon.png`, 1024x1024 PNG); Claude Code ignores `icon` at load time.
 Use strict manifest validation without the directory-submission profile.
 
 ## Helper paths and compatibility
@@ -91,11 +93,11 @@ plugin directory so selecting another version preserves it.
 | `grokbot` | Quoted bundled script location checked. No webhook task or desktop action exercised. Existing credentials, platform setup and human outward-action decisions remain necessary. |
 | `scope-guard`, `tools-router` | Procedures are discoverable; paired hook/recon setup remains separate and opt-in. Loading alone provides no structural protection or scheduled recon. |
 | `author-workflow-fanout`, `tdd-loop` | Bundled helpers retained; their Workflow/native host prerequisites are not provisioned. Existing offline helper checks remain applicable. |
-| `office-hours`, `design-consultation` | References and notices retained; host tool capabilities still determine execution. Loading does not install browser tooling or write profiles. |
+| `office-hours`, `design-consultation`, `orion-web-director`, `orion-frontend-builder`, `web-render-reviewer` | References and notices retained; host tool capabilities still determine execution. Loading does not install browser tooling or write profiles. |
 | `orion-deep-research` | Requires a compatible Claude Workflow tool and output prerequisites. Native execution remains unqualified; retain its provenance/evidence limits. Plugin discovery does not supply that executor. |
 | `delegate` | Discoverable, but its documentation still points at a direct-install helper path. Plugin-only execution is not qualified: use its existing deliberate direct installation if needed. Do not alter its executable-selection policy to make packaging pass. Hardening stays deferred. |
 
-All 29 definitions being discovered is not a claim that all 29 workflows execute
+All 32 definitions being discovered is not a claim that all 32 workflows execute
 from a plugin-only setup. Codex support remains the three pinned verification
 skills in the README. This qualification establishes no Cowork, browser or native
 Workflow compatibility. Do not edit the plugin cache to provide credentials,

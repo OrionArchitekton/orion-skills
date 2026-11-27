@@ -63,6 +63,29 @@ of every workflow. See the [plugin loading and compatibility runbook](docs/runbo
 for clone/archive loading, helper paths, explicit updates/removal, per-skill limits,
 and the existing Workflow prerequisite. No marketplace is provided; updates are manual. Codex qualification remains exactly the three skills below.
 
+### Gemini CLI extension
+
+The repository root is also a skills-only
+[Gemini CLI extension](https://geminicli.com/docs/extensions/reference/):
+`gemini-extension.json` declares the extension and Gemini CLI discovers every
+`skills/*/SKILL.md` as an agent skill. It adds no MCP servers, hooks, commands or
+context file.
+
+```bash
+gemini extensions install https://github.com/OrionArchitekton/orion-skills
+gemini skills list   # the 32 skills appear under the orion-skills extension
+```
+
+**Compatibility:** under Gemini CLI only skill discovery is verified (Gemini CLI
+0.70.0 lists all 32); no workflow is qualified on that host. Claude Code is the
+target for the full library and Codex for the three skills below. Several skills
+depend on Claude Code features and will not work as written under Gemini CLI:
+`orion-deep-research` and `author-workflow-fanout` (Claude Code Workflow tool),
+`readonly` and `scope-guard` (Claude Code PreToolUse hooks and tool names), and
+`x`, `gist`, `grokbot` and `readonly` helper paths written for direct installs or
+`${CLAUDE_PLUGIN_ROOT}`. Treat the rest as prose procedures that use whatever
+tools and approvals the Gemini host provides.
+
 ### skills CLI
 
 The [`skills` CLI](https://github.com/vercel-labs/skills) can list and install skills
@@ -143,10 +166,36 @@ network, and approval capabilities the active Codex host provides; they do not
 provision credentials or connectors. The wider library has not yet been
 validated as a Codex set.
 
+## Examples
+
+Prompts that exercise real skills. With the plugin loaded, prefix explicit
+invocations as `/orion-skills:<name>`.
+
+1. **`pre-pr`**: "Run pre-pr on this branch before I open the PR." Detects the real
+   base branch, runs the repo's declared checks, secret-scans the diff, and returns a
+   Pre-PR Report (CLEAR or ISSUES, with BLOCKING / WARNING / INFO findings).
+2. **`prove-deploy-is-live`**: "Production was just deployed. Prove
+   https://app.example.com is serving the new build, not the old image." Checks
+   version identity, a real-route serve and an end-to-end success terminus, and says
+   "wired but unproven" when it cannot prove it.
+3. **`reprobe-stale-premise`**: "The handoff says the login bug is still broken and
+   the fix PR never merged. Check that before we act on it." Re-probes fetched origin,
+   real PR state and a reproduction before any work starts.
+4. **`ship`** (operator-invoked): `/orion-skills:ship` on a finished change. RED/GREEN
+   tests, then a PR, a fail-open review, and an independent runtime check before
+   "done".
+5. **`goal-prompt`**: "Turn 'migrate the billing worker to the new queue' into a
+   /goal prompt with a checkable stop condition." Builds the prompt; never fires it.
+6. **`incident-as-code`**: "We root-caused last night's outage. Close it out."
+   Commits a `docs/solutions/` write-up (plus a runbook if the class recurs) into the
+   affected repo.
+
 ## Skills
 
-The released catalog contains 32 skills. `reassert-guards-on-rewrite` and
-`apply-review-findings` were added in v0.7.0; v0.7.1 adds optional plugin loading.
+The catalog contains 32 skills. `reassert-guards-on-rewrite` and
+`apply-review-findings` were added in v0.7.0; v0.7.1 adds optional plugin loading
+(29 skills); 0.8.0 adds `orion-web-director`, `orion-frontend-builder` and
+`web-render-reviewer`.
 
 | Skill | What it does | Invoke when |
 |---|---|---|
@@ -328,6 +377,61 @@ The released catalog contains 32 skills. `reassert-guards-on-rewrite` and
   the bot browses from its cloud computer and writes its answer to the outbox folder through the
   desktop app, and the agent prints it about 30 seconds later. A 200 only means the run started;
   the outbox file is the proof it finished, and a timeout is collected later rather than re-sent.
+
+## Data, network and privacy
+
+- The plugin itself collects and stores no personal data, and loading it (as a
+  Claude Code plugin, Gemini CLI extension or direct skill copy) sends nothing
+  anywhere. There is no telemetry and no MCP server.
+- Skills operate on the user's local repository files. Some write local state on the
+  user's machine: publish cap ledgers and logs (`x`, `gist`), the `readonly` session
+  marker, and handoff / context-pack notes (`pre-compact`).
+- A skill runs when the user invokes it or when the host agent selects it for a
+  matching task. On hosts that honor `disable-model-invocation: true` (Claude Code,
+  Codex), `readonly`, `gist` and `ship` are operator-invoked only; the others,
+  including `x`, `delegate` and `grokbot`, can be selected by the agent. Gemini CLI
+  0.70.0 does not read that field, so its model can activate any of the 32 skills,
+  including `gist` and `ship`: the default approval mode asks the operator to
+  confirm each activation, while auto-approval modes do not. Sends to a third party happen only when
+  such a skill runs and the user has configured it with their own credentials:
+  - `x`: posts text to the X API (`POST https://api.x.com/2/tweets`, OAuth 1.0a
+    user context). Ships disarmed: nothing is sent until the user creates the arm
+    flag. Once armed, the supported autonomous mode (an agent loop, optionally
+    nudged by the Stop-hook pattern in `skills/x/references/HOOK-PATTERN.md`) can
+    publish without a separate request or approval for each post, limited by the
+    redactor and a daily cap (default 5, `X_DAILY_CAP`).
+  - `gist`: fetches an already-public file from `raw.githubusercontent.com` and
+    creates a public gist through the GitHub CLI (`gh gist create`, the user's `gh`
+    login). Operator-invoked only, and ships disarmed behind two arm flags.
+  - `delegate`: sends the task text to another vendor's own CLI or endpoint: OpenAI
+    Codex (the user's ChatGPT login), xAI's `grok` CLI (the user's `XAI_API_KEY`), or
+    Ollama's `/api/generate` at `OLLAMA_HOST` (default `http://localhost:11434`; a
+    remote host only if the user sets one).
+  - `grokbot`: `grokbot-send` posts the task to the user's own Grok Bot routine
+    webhook (`GROKBOT_WEBHOOK_URL` / `GROKBOT_WEBHOOK_KEY`). `grokbot-read` only reads
+    the desktop app's local chat cache.
+- Other network use goes through the user's own tools and the host agent's
+  approvals:
+  - Git remote and GitHub (`git fetch` / `git push`, `gh pr` / `gh repo` /
+    `gh auth status`, the user's login): `reprobe-stale-premise` (fetches origin and
+    queries PR state), `document-release` (detects the platform and base branch,
+    pushes), `ship` and `oss-loop` (open PRs), `pre-pr` and `ship`
+    (`git remote show origin` queries the remote's default branch), `tools-router`
+    (its recon runs `gh auth status` among other CLI probes).
+  - The user's own services: `prove-deploy-is-live` sends HTTP requests to the
+    deployment being verified.
+  - Web search and fetch through the host agent's tools, when available. These can
+    reach third-party sites the user has never visited (and expose the user's IP
+    address to them, depending on the host's fetch path):
+    `orion-deep-research` (searches and fetches sources), `office-hours`,
+    `design-consultation` (also browser screenshots when a browser tool exists) and
+    `investigate`. `investigate` can search automatically for an unfamiliar error
+    after it instructs the agent to strip hostnames, paths and identifiers; there is
+    no separate consent prompt beyond the host's own tool approvals.
+- Third-party services (X, GitHub, OpenAI, xAI, Ollama hosts, Grok Bot, any search
+  provider) retain data under their own terms. This project keeps no copy.
+- Support: [GitHub Issues](https://github.com/OrionArchitekton/orion-skills/issues).
+  Contact: dan@danmercede.com.
 
 ## Authoring conventions
 

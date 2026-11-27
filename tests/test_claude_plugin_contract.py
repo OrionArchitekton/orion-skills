@@ -3,7 +3,9 @@ import json
 import os
 import re
 import shutil
+import struct
 import subprocess
+import zlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,11 +19,14 @@ class ClaudePluginContractTest(unittest.TestCase):
     def test_manifest_uses_the_single_default_skill_tree_without_activation(self):
         manifest = json.loads((ROOT / '.claude-plugin/plugin.json').read_text())
         self.assertEqual(manifest['name'], 'orion-skills')
-        self.assertEqual(manifest['version'], '0.7.1')
+        self.assertEqual(manifest['version'], '0.8.0')
         self.assertEqual(set(manifest), {
-            'name', 'version', 'description', 'author', 'homepage',
-            'repository', 'license',
+            'name', 'displayName', 'version', 'description', 'author',
+            'homepage', 'repository', 'license', 'icon',
         })
+        self.assertEqual(manifest['displayName'], 'Orion Skills')
+        self.assertEqual(manifest['author'], {
+            'name': 'Dan Mercede', 'url': 'https://www.danmercede.com'})
         self.assertEqual(manifest['license'], 'MIT')
         for name in ('readonly', 'gist', 'ship'):
             self.assertIs(frontmatter_fields(ROOT / 'skills' / name / 'SKILL.md')
@@ -33,11 +38,53 @@ class ClaudePluginContractTest(unittest.TestCase):
         self.assertEqual(len(paths), 32)
         self.assertFalse(any(p.is_symlink() for p in (ROOT / 'skills').rglob('*')))
 
+    def test_listing_icon_meets_directory_limits(self):
+        manifest = json.loads((ROOT / '.claude-plugin/plugin.json').read_text())
+        icon = (ROOT / manifest['icon']).resolve()
+        self.assertEqual(icon, (ROOT / '.claude-plugin/icon.png').resolve())
+        data = icon.read_bytes()
+        self.assertLess(len(data), 2 * 1024 * 1024)
+        self.assertEqual(data[:8], b'\x89PNG\r\n\x1a\n')
+        # Walk every chunk: CRCs must match, IHDR first, IEND last with no
+        # trailing bytes, and the IDAT stream must inflate to the exact size
+        # implied by IHDR (stdlib only; no image library dependency).
+        chunks, offset = [], 8
+        while offset < len(data):
+            self.assertLessEqual(offset + 12, len(data), 'truncated chunk')
+            length, kind = struct.unpack('>I4s', data[offset:offset + 8])
+            body = data[offset + 8:offset + 8 + length]
+            self.assertEqual(len(body), length, 'truncated chunk body')
+            crc, = struct.unpack('>I', data[offset + 8 + length:offset + 12 + length])
+            self.assertEqual(zlib.crc32(kind + body) & 0xffffffff, crc, kind)
+            chunks.append((kind, body))
+            offset += 12 + length
+        self.assertEqual(chunks[0][0], b'IHDR')
+        self.assertEqual(chunks[-1], (b'IEND', b''))
+        width, height, depth, color, _, _, interlace = struct.unpack(
+            '>IIBBBBB', chunks[0][1])
+        self.assertEqual(width, height)
+        self.assertTrue(512 <= width <= 2048, width)
+        channels = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[color]
+        self.assertEqual(interlace, 0)
+        raw = zlib.decompress(b''.join(b for k, b in chunks if k == b'IDAT'))
+        row = (width * channels * depth + 7) // 8
+        self.assertEqual(len(raw), height * (row + 1))
+        self.assertTrue(all(raw[y * (row + 1)] <= 4 for y in range(height)))
+
+    def test_gemini_extension_is_skills_only_and_version_aligned(self):
+        manifest = json.loads((ROOT / '.claude-plugin/plugin.json').read_text())
+        extension = json.loads((ROOT / 'gemini-extension.json').read_text())
+        self.assertEqual(extension['name'], 'orion-skills')
+        self.assertEqual(extension['version'], manifest['version'])
+        self.assertEqual(extension['description'], manifest['description'])
+        self.assertEqual(set(extension), {'name', 'version', 'description'})
+        self.assertFalse((ROOT / 'GEMINI.md').exists())
+
     def test_documented_plugin_paths_survive_relocation_and_spaces(self):
         # Execute only synthetic local operations, never publishing or delegation.
         with tempfile.TemporaryDirectory(prefix='orion-plugin-') as tmp:
             root = Path(tmp)
-            plugin = root / 'cache/orion-skills/0.7.1 with spaces'
+            plugin = root / 'cache/orion-skills/0.8.0 with spaces'
             shutil.copytree(ROOT / 'skills', plugin / 'skills',
                             ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
             home = root / 'home'
