@@ -1,0 +1,14 @@
+{
+  "name": "orion-architekton-skills",
+  "displayName": "Orion Architekton Workflow Skills",
+  "version": "1.0.0",
+  "description": "Markdown-only workflow and verification skills for coding agents: preflight a branch before a PR, keep edits inside a declared scope, prove a deploy is live, prove a control actually binds, and close incidents with a committed write-up.",
+  "author": {
+    "name": "Dan Mercede",
+    "url": "https://www.danmercede.com"
+  },
+  "homepage": "https://github.com/OrionArchitekton/orion-skills/tree/main/claude-plugin",
+  "repository": "https://github.com/OrionArchitekton/orion-skills",
+  "license": "MIT",
+  "keywords": ["workflow", "code-review", "verification", "shipping", "planning", "incident-response"]
+}
