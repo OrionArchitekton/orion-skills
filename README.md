@@ -194,7 +194,7 @@ invocations as `/orion-skills:<name>`.
 
 The catalog contains 32 skills. `reassert-guards-on-rewrite` and
 `apply-review-findings` were added in v0.7.0; v0.7.1 adds optional plugin loading
-(29 skills); 0.8.0 adds `orion-web-director`, `orion-frontend-builder` and
+(29 skills); 1.0.0 adds `orion-web-director`, `orion-frontend-builder` and
 `web-render-reviewer`.
 
 | Skill | What it does | Invoke when |

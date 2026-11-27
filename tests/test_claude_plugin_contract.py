@@ -19,7 +19,7 @@ class ClaudePluginContractTest(unittest.TestCase):
     def test_manifest_uses_the_single_default_skill_tree_without_activation(self):
         manifest = json.loads((ROOT / '.claude-plugin/plugin.json').read_text())
         self.assertEqual(manifest['name'], 'orion-skills')
-        self.assertEqual(manifest['version'], '0.8.0')
+        self.assertEqual(manifest['version'], '1.0.0')
         self.assertEqual(set(manifest), {
             'name', 'displayName', 'version', 'description', 'author',
             'homepage', 'repository', 'license', 'icon',
@@ -84,7 +84,7 @@ class ClaudePluginContractTest(unittest.TestCase):
         # Execute only synthetic local operations, never publishing or delegation.
         with tempfile.TemporaryDirectory(prefix='orion-plugin-') as tmp:
             root = Path(tmp)
-            plugin = root / 'cache/orion-skills/0.8.0 with spaces'
+            plugin = root / 'cache/orion-skills/1.0.0 with spaces'
             shutil.copytree(ROOT / 'skills', plugin / 'skills',
                             ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
             home = root / 'home'

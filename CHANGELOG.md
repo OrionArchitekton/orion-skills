@@ -4,10 +4,23 @@ All notable changes to the orion-skills library. This project follows Semantic
 Versioning (https://semver.org): adding a skill is a MINOR bump, a non-breaking change to
 an existing skill is a PATCH, and removing or breaking a skill is a MAJOR bump.
 
-## [0.8.0] - Unreleased (prepared 2026-11-26, not tagged)
+## [1.0.0] - Unreleased (prepared 2026-11-26)
 
-Adds three skills (MINOR under the new-skill policy) plus directory-listing
-metadata. The catalog now contains 32 skills.
+MAJOR release: `delegate` now rejects workspace-local and relative CLI
+installations that earlier versions accepted (PR #35), which breaks those
+setups. It also adds three skills and directory-listing metadata. The catalog
+now contains 32 skills.
+
+### Breaking
+
+- Delegate rejects relative and workspace-controlled CLI selections before launch,
+  checks intermediate symlinks and rechecks the selected launcher before spawning.
+  Outside custom, user, system and manager-shim layouts retain launcher identity.
+  Workspace-local and relative installs previously accepted now fail; use a CLI
+  installed outside the workspace with an absolute PATH entry (an outside symlink
+  to an in-workspace target does not migrate it). See
+  `docs/runbooks/delegate-executable-selection.md` for the fixture compatibility
+  matrix, migration and unqualified native-platform boundaries.
 
 ### Added
 
@@ -24,16 +37,6 @@ metadata. The catalog now contains 32 skills.
 ### Changed
 
 - Plugin runbook and README skill counts now read 32 (29 at v0.7.1).
-
-### Compatibility (decision still open)
-
-- Delegate rejects relative and workspace-controlled CLI selections before launch,
-  checks intermediate symlinks and rechecks the selected launcher before spawning.
-  Outside custom, user, system and manager-shim layouts retain launcher identity.
-- This intentionally breaks workspace-local/relative installs previously accepted.
-  PR #35 recommended a MAJOR release if adopted. This entry is prepared as 0.8.0
-  as directed on 2026-11-26; confirm MINOR versus 1.0.0 before tagging. See `docs/runbooks/delegate-executable-selection.md` for the fixture
-  compatibility matrix, migration and unqualified native-platform boundaries.
 
 ## [0.7.1] - 2026-11-02
 

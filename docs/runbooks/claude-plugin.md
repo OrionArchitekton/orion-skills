@@ -16,7 +16,7 @@ references:
 
 The plugin is session-local installation convenience for this repository's existing
 32 skill definitions (29 in published v0.7.1). Tested CLI: **Claude Code 2.1.316, Linux/POSIX**;
-the 0.8.0 manifest also validates strict with no directory findings on 2.1.332. Published
+the 1.0.0 manifest also validates strict with no directory findings on 2.1.332. Published
 collection/plugin version: [**0.7.1**](https://github.com/OrionArchitekton/orion-skills/releases/tag/v0.7.1).
 The published v0.7.0 has no plugin manifest and remains unchanged. A plugin namespace
 is not a grant to publish, delegate, install hooks or change settings.
